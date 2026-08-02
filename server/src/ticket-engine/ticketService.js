@@ -88,6 +88,47 @@ async function verifyTicketIfRestored(ticket) {
   return ticket;
 }
 
+function ticketToObject(ticket) {
+  return typeof ticket?.toObject === "function" ? ticket.toObject() : ticket;
+}
+
+async function enrichTicketsWithRestoration(tickets = []) {
+  const plainTickets = tickets.map(ticketToObject);
+  const affectedPoleIds = [
+    ...new Set(plainTickets.flatMap((ticket) => ticket?.affected_pole_ids || [])),
+  ];
+  const poles = affectedPoleIds.length
+    ? await Pole.find({ pole_id: { $in: affectedPoleIds } }).select("pole_id is_energized").lean()
+    : [];
+  const energizedByPole = new Map(poles.map((pole) => [pole.pole_id, pole.is_energized === true]));
+
+  return plainTickets.map((ticket) => {
+    const isFinal = ["verified", "closed"].includes(ticket.status);
+    const affected = ticket.affected_pole_ids || [];
+    const remainingDarkPoleIds = isFinal
+      ? []
+      : affected.filter((poleId) => energizedByPole.get(poleId) !== true);
+    const canVerifyRepair = !isFinal && affected.length > 0 && remainingDarkPoleIds.length === 0;
+
+    return {
+      ...ticket,
+      can_verify_repair: canVerifyRepair,
+      remaining_dark_poles: remainingDarkPoleIds.length,
+      remaining_dark_pole_ids: remainingDarkPoleIds.slice(0, 20),
+      restoration_state: isFinal
+        ? "verified"
+        : canVerifyRepair
+          ? "ready_to_verify"
+          : "waiting_for_power",
+    };
+  });
+}
+
+async function enrichTicketWithRestoration(ticket) {
+  const [enriched] = await enrichTicketsWithRestoration([ticket]);
+  return enriched;
+}
+
 async function checkAndVerifyTicketsForPole(poleId) {
   const openTickets = await Ticket.find({
     affected_pole_ids: poleId,
@@ -122,6 +163,8 @@ export {
   buildIncidentSummary,
   checkAndVerifyTicketsForAffectedPoles,
   checkAndVerifyTicketsForPole,
+  enrichTicketWithRestoration,
+  enrichTicketsWithRestoration,
   upsertTicketFromFault,
   verifyTicketIfRestored,
 };

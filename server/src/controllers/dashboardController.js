@@ -3,6 +3,7 @@ import Pole from "../models/Pole.js";
 import Telemetry from "../models/Telemetry.js";
 import Ticket from "../models/Ticket.js";
 import Transformer from "../models/Transformer.js";
+import { enrichTicketsWithRestoration } from "../ticket-engine/ticketService.js";
 
 function minutesBetween(a, b) {
   if (!a || !b) return null;
@@ -39,7 +40,7 @@ export async function getDashboard(req, res) {
       }),
       Pole.countDocuments({ is_energized: false }),
       Transformer.countDocuments(),
-      Ticket.find().sort({ detected_at: -1 }).limit(20).select("-__v"),
+      Ticket.find().sort({ detected_at: -1 }).limit(20).select("-__v").lean(),
       Telemetry.find().sort({ received_at: -1 }).limit(25).select("-__v"),
       Ticket.find({ verified_at: { $ne: null } }).select("detected_at verified_at"),
     ]);
@@ -58,7 +59,7 @@ export async function getDashboard(req, res) {
         average_detection_seconds: null,
         average_resolution_minutes: avgResolutionMinutes,
       },
-      tickets,
+      tickets: await enrichTicketsWithRestoration(tickets),
       recent_telemetry: recentTelemetry,
     });
   } catch (err) {
