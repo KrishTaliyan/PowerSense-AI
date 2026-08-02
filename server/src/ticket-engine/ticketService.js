@@ -1,15 +1,42 @@
+import { randomUUID } from "crypto";
 import Ticket from "../models/Ticket.js";
 import Pole from "../models/Pole.js";
-import { randomUUID } from "crypto";
+
+function buildIncidentSummary(fault) {
+  const affected = fault.affected_pole_ids?.length || 0;
+
+  if (fault.fault_type === "feeder") {
+    return `Feeder fault suspected on ${fault.feeder_id}. ${affected} downstream poles are affected. Confidence ${Math.round(
+      fault.confidence * 100
+    )}%. ${fault.confidence_reason}`;
+  }
+
+  if (fault.fault_type === "transformer") {
+    return `Transformer-level outage detected at ${fault.dt_id}. ${affected} downstream poles are affected. Confidence ${Math.round(
+      fault.confidence * 100
+    )}%. ${fault.confidence_reason}`;
+  }
+
+  const span = fault.last_live_pole_id
+    ? `${fault.last_live_pole_id} and ${fault.first_dark_pole_id}`
+    : `upstream of ${fault.first_dark_pole_id}`;
+
+  return `Span fault suspected between ${span}. ${affected} downstream poles are affected. Confidence ${Math.round(
+    fault.confidence * 100
+  )}%. ${fault.confidence_reason}`;
+}
 
 async function upsertTicketFromFault(fault) {
+  if (!fault || !fault.affected_pole_ids?.length) return null;
+
+  const matchConditions = [{ affected_pole_ids: { $in: fault.affected_pole_ids } }];
+  if (fault.first_dark_pole_id) matchConditions.push({ first_dark_pole_id: fault.first_dark_pole_id });
+  if (fault.fault_type === "feeder" && fault.feeder_id) matchConditions.push({ feeder_id: fault.feeder_id });
+  if (fault.fault_type === "transformer" && fault.dt_id) matchConditions.push({ dt_id: fault.dt_id });
+
   const existing = await Ticket.findOne({
-    dt_id: fault.dt_id,
-    status: { $nin: ["closed"] },
-    $or: [
-      { first_dark_pole_id: fault.first_dark_pole_id },
-      { affected_pole_ids: { $in: fault.affected_pole_ids } },
-    ],
+    status: { $nin: ["verified", "closed"] },
+    $or: matchConditions,
   });
 
   if (existing) {
@@ -19,6 +46,10 @@ async function upsertTicketFromFault(fault) {
     existing.affected_pole_count = existing.affected_pole_ids.length;
     existing.confidence = fault.confidence;
     existing.confidence_reason = fault.confidence_reason;
+    existing.ai_summary = buildIncidentSummary(fault);
+    existing.lat = fault.lat;
+    existing.lon = fault.lon;
+    existing.pincode = fault.pincode || existing.pincode;
     await existing.save();
     return existing;
   }
@@ -29,7 +60,7 @@ async function upsertTicketFromFault(fault) {
     status: "detected",
     last_live_pole_id: fault.last_live_pole_id || null,
     first_dark_pole_id: fault.first_dark_pole_id || null,
-    dt_id: fault.dt_id,
+    dt_id: fault.dt_id || null,
     feeder_id: fault.feeder_id || null,
     lat: fault.lat,
     lon: fault.lon,
@@ -40,26 +71,57 @@ async function upsertTicketFromFault(fault) {
     confidence_reason: fault.confidence_reason,
     localization_level: fault.localization_level,
     detected_at: new Date(),
+    ai_summary: buildIncidentSummary(fault),
   });
 }
 
+async function verifyTicketIfRestored(ticket) {
+  const poles = await Pole.find({ pole_id: { $in: ticket.affected_pole_ids } });
+  const allLive = poles.length > 0 && poles.every((p) => p.is_energized);
 
-async function checkAndVerifyTicketsForPole(pole_id) {
+  if (!allLive) return null;
+
+  ticket.status = "verified";
+  ticket.verified_at = new Date();
+  if (!ticket.resolved_at) ticket.resolved_at = ticket.verified_at;
+  await ticket.save();
+  return ticket;
+}
+
+async function checkAndVerifyTicketsForPole(poleId) {
   const openTickets = await Ticket.find({
-    affected_pole_ids: pole_id,
+    affected_pole_ids: poleId,
     status: { $nin: ["verified", "closed"] },
   });
 
+  const verified = [];
   for (const ticket of openTickets) {
-    const poles = await Pole.find({ pole_id: { $in: ticket.affected_pole_ids } });
-    const allLive = poles.every((p) => p.is_energized);
-
-    if (allLive) {
-      ticket.status = "verified";
-      ticket.verified_at = new Date();
-      await ticket.save();
-    }
+    const updated = await verifyTicketIfRestored(ticket);
+    if (updated) verified.push(updated);
   }
+
+  return verified;
 }
 
-export { upsertTicketFromFault, checkAndVerifyTicketsForPole };
+async function checkAndVerifyTicketsForAffectedPoles(poleIds) {
+  const openTickets = await Ticket.find({
+    affected_pole_ids: { $in: poleIds },
+    status: { $nin: ["verified", "closed"] },
+  });
+
+  const verified = [];
+  for (const ticket of openTickets) {
+    const updated = await verifyTicketIfRestored(ticket);
+    if (updated) verified.push(updated);
+  }
+
+  return verified;
+}
+
+export {
+  buildIncidentSummary,
+  checkAndVerifyTicketsForAffectedPoles,
+  checkAndVerifyTicketsForPole,
+  upsertTicketFromFault,
+  verifyTicketIfRestored,
+};

@@ -6,6 +6,9 @@ import connectDB from "../src/config/db.js";
 import Pole from "../src/models/Pole.js";
 import Transformer from "../src/models/Transformer.js";
 import Device from "../src/models/Device.js";
+import Telemetry from "../src/models/Telemetry.js";
+import Ticket from "../src/models/Ticket.js";
+import ScheduledOutage from "../src/models/ScheduledOutage.js";
 import generateNetwork from "../src/simulation/generateNetwork.js";
 
 async function seed() {
@@ -17,6 +20,9 @@ async function seed() {
     Pole.deleteMany({}),
     Transformer.deleteMany({}),
     Device.deleteMany({}),
+    Telemetry.deleteMany({}),
+    Ticket.deleteMany({}),
+    ScheduledOutage.deleteMany({}),
   ]);
 
   await Transformer.insertMany(transformers);

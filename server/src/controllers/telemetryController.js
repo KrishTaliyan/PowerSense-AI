@@ -1,4 +1,5 @@
 import { ingestTelemetry } from "../services/telemetryService.js";
+import Telemetry from "../models/Telemetry.js";
 
 export async function postTelemetry(req, res) {
   const { device_id, pole_id, event, energized, ts, seq } = req.body;
@@ -13,5 +14,20 @@ export async function postTelemetry(req, res) {
   } catch (err) {
     console.error("Telemetry ingest error:", err.message);
     return res.status(500).json({ error: "Failed to process telemetry" });
+  }
+}
+
+export async function listRecentTelemetry(req, res) {
+  try {
+    const limit = Math.min(Number(req.query.limit || 50), 200);
+    const records = await Telemetry.find()
+      .sort({ received_at: -1 })
+      .limit(limit)
+      .select("-__v");
+
+    return res.json(records);
+  } catch (err) {
+    console.error("Telemetry list error:", err.message);
+    return res.status(500).json({ error: "Failed to list telemetry" });
   }
 }

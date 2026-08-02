@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 
 const FEEDER_COUNT = 5;
-const DT_PER_FEEDER = 8; // 5 * 8 = 40 transformers
+const DT_PER_FEEDER = 10; // 5 * 10 = 50 transformers
 const BASE_LAT = 12.9716;
 const BASE_LON = 77.5946;
 const PINCODES = ["560001", "560002", "560034", "560078", "560095"];
@@ -34,6 +34,31 @@ function buildLine(startLat, startLon, dtId, feederId, count, prefix) {
   return poles;
 }
 
+function buildBranch(startPole, dtId, feederId, count, prefix) {
+  const poles = [];
+  let lat = startPole.lat;
+  let lon = startPole.lon;
+
+  for (let i = 1; i <= count; i++) {
+    lat = jitter(lat, 0.0015);
+    lon = jitter(lon, 0.0015);
+    poles.push({
+      pole_id: `P-${prefix}-${String(i).padStart(3, "0")}`,
+      lat,
+      lon,
+      dt_id: dtId,
+      feeder_id: feederId,
+      seq_on_line: Number(startPole.seq_on_line || 0) + i / 100,
+      parent_pole_id: i === 1 ? startPole.pole_id : `P-${prefix}-${String(i - 1).padStart(3, "0")}`,
+      pole_type: Math.random() > 0.5 ? "LT-9m-PCC" : "LT-8m-Steel",
+      ward: WARDS[Math.floor(Math.random() * WARDS.length)],
+      pincode: PINCODES[Math.floor(Math.random() * PINCODES.length)],
+    });
+  }
+
+  return poles;
+}
+
 function generateNetwork() {
   const feeders = [];
   const transformers = [];
@@ -59,16 +84,14 @@ function generateNetwork() {
         has_known_topology: hasKnownTopology,
       });
 
-      const mainCount = 20 + Math.floor(Math.random() * 60);
+      const mainCount = 45 + Math.floor(Math.random() * 50);
       let dtPoles = buildLine(dtLat, dtLon, dtId, feederId, mainCount, `${dtId}-M`);
 
       const branchCount = Math.floor(Math.random() * 3); // 0-2 branches
       for (let b = 1; b <= branchCount; b++) {
         const branchFrom = dtPoles[Math.floor(Math.random() * dtPoles.length)];
         const branchLen = 5 + Math.floor(Math.random() * 15);
-        dtPoles = dtPoles.concat(
-          buildLine(branchFrom.lat, branchFrom.lon, dtId, feederId, branchLen, `${dtId}-B${b}`)
-        );
+        dtPoles = dtPoles.concat(buildBranch(branchFrom, dtId, feederId, branchLen, `${dtId}-B${b}`));
       }
 
       if (!hasKnownTopology) {

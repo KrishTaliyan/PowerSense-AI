@@ -4,10 +4,12 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-  "dev": "nodemon server.js",
-  "seed": "node scripts/seed.js",
-  "test": "echo \"Error: no test specified\" && exit 1"
-},
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "seed": "node scripts/seed.js",
+    "docker:start": "npm run seed && npm start",
+    "test": "node --test"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",

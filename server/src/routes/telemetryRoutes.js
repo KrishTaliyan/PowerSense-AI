@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { postTelemetry } from "../controllers/telemetryController.js";
+import { listRecentTelemetry, postTelemetry } from "../controllers/telemetryController.js";
 
 const router = Router();
 router.post("/telemetry", postTelemetry);
+router.get("/telemetry/recent", listRecentTelemetry);
 
 export default router;
