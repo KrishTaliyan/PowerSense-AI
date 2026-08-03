@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import "./App.css";
 import CommandPalette from "./components/CommandPalette.jsx";
 import Icon from "./components/Icon.jsx";
+import ProductTour from "./components/ProductTour.jsx";
+import SettingsModal from "./components/SettingsModal.jsx";
 import TicketDrawer from "./components/TicketDrawer.jsx";
 import { API_BASE, navigation } from "./constants.js";
 import MapPage from "./pages/MapPage.jsx";
@@ -21,21 +23,31 @@ function App() {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [selectedPole, setSelectedPole] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [lastSync, setLastSync] = useState(null);
   const [focusMode, setFocusMode] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem("powersense-tour-complete") !== "true";
+  });
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
     return window.localStorage.getItem("powersense-theme") || "dark";
   });
 
-  const tickets = dashboard?.tickets || [];
+  const ticketsData = dashboard?.tickets;
+  const tickets = useMemo(() => ticketsData || [], [ticketsData]);
   const recentTelemetryData = dashboard?.recent_telemetry;
   const recentTelemetry = useMemo(() => recentTelemetryData || [], [recentTelemetryData]);
   const stats = dashboard?.stats || {};
   const activeTickets = tickets.filter((ticket) => !["verified", "closed"].includes(ticket.status));
+  const selectedTicketForDrawer = selectedTicket
+    ? tickets.find((ticket) => ticket.ticket_id === selectedTicket.ticket_id) || selectedTicket
+    : null;
   const selectedTransformer = transformers.find((transformer) => transformer.dt_id === selectedDt);
   const feederId = selectedTransformer?.feeder_id || transformers[0]?.feeder_id || "";
   const cleanPackets = recentTelemetry.filter((row) => !row.is_duplicate && !row.is_stale).length;
@@ -60,6 +72,8 @@ function App() {
       setError("");
     } catch (err) {
       setError(err.message);
+    } finally {
+      setInitialLoading(false);
     }
   }, [selectedDt]);
 
@@ -138,13 +152,31 @@ function App() {
     }
   }
 
-  function jumpTo(tab) {
+  const jumpTo = useCallback((tab) => {
     setActiveTab(tab);
     setCommandOpen(false);
-  }
+  }, []);
 
-  function selectTicket(ticket) {
+  const selectTicket = useCallback((ticket) => {
     setSelectedTicket(ticket);
+  }, []);
+
+  const selectTransformer = useCallback((transformer) => {
+    setSelectedDt(transformer.dt_id);
+    setSelectedPole(null);
+    setActiveTab("Map");
+  }, []);
+
+  const selectPoleFromCommand = useCallback((pole) => {
+    if (pole.dt_id) setSelectedDt(pole.dt_id);
+    setSelectedPole(pole);
+    setActiveTab("Map");
+  }, []);
+
+  function restartTour() {
+    window.localStorage.removeItem("powersense-tour-complete");
+    setSettingsOpen(false);
+    setTourOpen(true);
   }
 
   function renderContent() {
@@ -153,6 +185,8 @@ function App() {
         <MapPage
           poles={poles}
           refresh={refresh}
+          error={error}
+          loading={initialLoading}
           selectedPole={selectedPole}
           selectedTransformer={selectedTransformer}
           selectTicket={selectTicket}
@@ -163,24 +197,27 @@ function App() {
     }
 
     if (activeTab === "Tickets") {
-      return <TicketsPage activeTickets={activeTickets} selectTicket={selectTicket} tickets={tickets} updateTicketStatus={updateTicketStatus} />;
+      return <TicketsPage activeTickets={activeTickets} error={error} loading={initialLoading} refresh={refresh} selectTicket={selectTicket} tickets={tickets} updateTicketStatus={updateTicketStatus} />;
     }
 
     if (activeTab === "Telemetry") {
-      return <TelemetryPage recentTelemetry={recentTelemetry} signalContinuity={signalContinuity} />;
+      return <TelemetryPage error={error} loading={initialLoading} recentTelemetry={recentTelemetry} refresh={refresh} signalContinuity={signalContinuity} />;
     }
 
     if (activeTab === "Simulation") {
-      return <SimulationPage busy={busy} feederId={feederId} fromSeq={fromSeq} post={post} selectedDt={selectedDt} />;
+      return <SimulationPage busy={busy} error={error} feederId={feederId} fromSeq={fromSeq} loading={initialLoading} post={post} refresh={refresh} selectedDt={selectedDt} />;
     }
 
     return (
       <OverviewPage
         activeTickets={activeTickets}
+        error={error}
         focusMode={focusMode}
         jumpTo={jumpTo}
         lastSync={lastSync}
+        loading={initialLoading}
         poles={poles}
+        refresh={refresh}
         selectTicket={selectTicket}
         selectedPole={selectedPole}
         selectedTransformer={selectedTransformer}
@@ -213,7 +250,7 @@ function App() {
         </nav>
         <div className="sidebar-spacer" />
         <div className="network-status"><div className="status-heading"><span className="live-dot" />Connection status</div><strong>Everything is running</strong><span>Live device connection - 42ms</span><div className="status-bar"><i /></div></div>
-        <div className="sidebar-footer"><button className="operator-chip" type="button"><span className="avatar">OP</span><span><strong>Control room</strong><small>Operator online</small></span><span className="online-dot" /></button></div>
+        <div className="sidebar-footer"><button className="operator-chip" onClick={() => setSettingsOpen(true)} type="button"><span className="avatar">OP</span><span><strong>Control room</strong><small>Settings available</small></span><span className="online-dot" /></button></div>
       </aside>
 
       <section className="workspace">
@@ -224,6 +261,7 @@ function App() {
             <div className="sync-status"><span className="live-dot" />Live <span className="sync-time">{lastSync ? formatTime(lastSync) : "-"}</span></div>
             <button className={cx("focus-button", focusMode && "focus-enabled")} onClick={() => setFocusMode((mode) => !mode)} type="button"><Icon name="target" size={16} />{focusMode ? "Focus on" : "Focus mode"}</button>
             <button className="theme-toggle" aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} type="button"><Icon name={theme === "dark" ? "sun" : "moon"} size={16} /><span>{theme === "dark" ? "Light" : "Dark"}</span></button>
+            <button className="icon-button" aria-label="Open settings" onClick={() => setSettingsOpen(true)} type="button"><Icon name="settings" size={17} /></button>
             <button className="icon-button" aria-label="Refresh data" onClick={refresh} type="button"><Icon name="refresh" size={17} /></button>
           </div>
         </header>
@@ -239,8 +277,22 @@ function App() {
         </main>
       </section>
 
-      {selectedTicket && <TicketDrawer onClose={() => setSelectedTicket(null)} onStatus={updateTicketStatus} ticket={selectedTicket} />}
-      {commandOpen && <CommandPalette onAction={(action) => { if (action === "span") post("/simulate/span-fault", { dt_id: selectedDt, from_seq: fromSeq }, "Span fault"); }} onClose={() => setCommandOpen(false)} onNavigate={jumpTo} />}
+      {selectedTicketForDrawer && <TicketDrawer onClose={() => setSelectedTicket(null)} onStatus={updateTicketStatus} ticket={selectedTicketForDrawer} />}
+      {commandOpen && (
+        <CommandPalette
+          onAction={(action) => { if (action === "span") post("/simulate/span-fault", { dt_id: selectedDt, from_seq: fromSeq }, "Span fault"); }}
+          onClose={() => setCommandOpen(false)}
+          onNavigate={jumpTo}
+          onSelectPole={selectPoleFromCommand}
+          onSelectTicket={selectTicket}
+          onSelectTransformer={selectTransformer}
+          poles={poles}
+          tickets={tickets}
+          transformers={transformers}
+        />
+      )}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} onRestartTour={restartTour} setTheme={setTheme} theme={theme} />}
+      <ProductTour active={tourOpen} onClose={() => setTourOpen(false)} onNavigate={jumpTo} />
     </div>
   );
 }

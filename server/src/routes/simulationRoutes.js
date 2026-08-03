@@ -3,6 +3,7 @@ import {
   postDelayedMessage,
   postDuplicateMessage,
   postFeederFault,
+  postConfiguredSimulation,
   postKillDevice,
   postRepair,
   postScheduledOutage,
@@ -14,6 +15,7 @@ const router = Router();
 router.post("/simulate/span-fault", postSpanFault);
 router.post("/simulate/transformer-fault", postTransformerFault);
 router.post("/simulate/feeder-fault", postFeederFault);
+router.post("/simulate/configured", postConfiguredSimulation);
 router.post("/simulate/repair", postRepair);
 router.post("/simulate/scheduled-outage", postScheduledOutage);
 router.post("/simulate/kill-device", postKillDevice);

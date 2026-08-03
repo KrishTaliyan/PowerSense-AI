@@ -62,6 +62,109 @@ export function confidenceLabel(value) {
   return `${Math.round((Number(value) || 0) * 100)}%`;
 }
 
+export function confidenceTone(value) {
+  const score = Number(value) || 0;
+  if (score >= 0.8) return "High";
+  if (score >= 0.55) return "Medium";
+  return "Needs review";
+}
+
+export function confidenceBreakdown(ticket) {
+  const score = Number(ticket?.confidence) || 0;
+  const factors = [];
+
+  if (ticket?.localization_level === "span") {
+    factors.push({
+      label: "Live/dark boundary",
+      value: ticket.last_live_pole_id && ticket.first_dark_pole_id
+        ? `${ticket.last_live_pole_id} -> ${ticket.first_dark_pole_id}`
+        : "First dark pole observed",
+      tone: "positive",
+    });
+  } else if (ticket?.localization_level === "dt") {
+    factors.push({
+      label: "Topology limitation",
+      value: "Pole ordering is missing, so the UI reports a transformer-area range.",
+      tone: "warning",
+    });
+  } else {
+    factors.push({
+      label: "Feeder pattern",
+      value: "Reporting poles across the feeder are dark.",
+      tone: "positive",
+    });
+  }
+
+  factors.push({
+    label: "Affected evidence",
+    value: `${ticket?.affected_pole_count || 0} affected pole${ticket?.affected_pole_count === 1 ? "" : "s"} in the incident set.`,
+    tone: score >= 0.55 ? "positive" : "warning",
+  });
+
+  if (ticket?.remaining_dark_poles > 0) {
+    factors.push({
+      label: "Restoration check",
+      value: `${ticket.remaining_dark_poles} affected pole${ticket.remaining_dark_poles === 1 ? "" : "s"} still dark.`,
+      tone: "warning",
+    });
+  } else if (ticket?.affected_pole_count > 0) {
+    factors.push({
+      label: "Restoration check",
+      value: "All affected poles currently report energized.",
+      tone: "positive",
+    });
+  }
+
+  if (ticket?.confidence_reason) {
+    factors.push({ label: "Engine reason", value: ticket.confidence_reason, tone: "neutral" });
+  }
+
+  return {
+    score: confidenceLabel(score),
+    tone: confidenceTone(score),
+    factors,
+  };
+}
+
+export function estimatedFaultSpan(ticket) {
+  if (!ticket) return "-";
+  if (ticket.localization_level === "span") {
+    if (ticket.last_live_pole_id && ticket.first_dark_pole_id) {
+      return `${ticket.last_live_pole_id} to ${ticket.first_dark_pole_id}`;
+    }
+    return `Upstream of ${ticket.first_dark_pole_id || "first dark pole"}`;
+  }
+  if (ticket.localization_level === "dt") {
+    return `${ticket.dt_id || "Selected DT"} affected area, exact pole order unavailable`;
+  }
+  if (ticket.localization_level === "feeder") {
+    return `${ticket.feeder_id || "Feeder"} upstream of distribution transformers`;
+  }
+  return "Network area under review";
+}
+
+export function suggestedOperatorAction(ticket) {
+  if (!ticket) return "Open the incident and review telemetry evidence.";
+  if (["verified", "closed"].includes(ticket.status)) {
+    return "No field action needed. Keep the ticket available for audit.";
+  }
+  if (ticket.can_verify_repair) {
+    return "Verify restoration now; affected poles are reporting energized.";
+  }
+  if (ticket.status === "detected") {
+    return ticket.localization_level === "span"
+      ? "Acknowledge and dispatch a crew to inspect the estimated span."
+      : "Acknowledge and inspect the reported area before dispatching repair work.";
+  }
+  if (ticket.status === "acknowledged") {
+    return "Assign a crew and attach the incident evidence to the work order.";
+  }
+  if (ticket.status === "crew_assigned") {
+    return "Wait for repair telemetry, then verify only when every affected pole is live.";
+  }
+  return "Monitor restoration telemetry until the incident can be verified.";
+}
+
 export function restorationCopy(ticket) {
   const isFinal = ["verified", "closed"].includes(ticket?.status);
   const remaining = Number(ticket?.remaining_dark_poles ?? ticket?.affected_pole_count ?? 0);

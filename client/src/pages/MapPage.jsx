@@ -1,14 +1,19 @@
 import ActionButton from "../components/ActionButton.jsx";
+import HelpTooltip from "../components/HelpTooltip.jsx";
 import Icon from "../components/Icon.jsx";
+import { ErrorState, PageSkeleton } from "../components/PageState.jsx";
 import SchematicMap from "../components/SchematicMap.jsx";
 import { cx, formatRelative } from "../utils/format.js";
 
-export default function MapPage({ poles, refresh, selectedPole, selectedTransformer, selectTicket, setSelectedPole, tickets }) {
+export default function MapPage({ error, loading, poles, refresh, selectedPole, selectedTransformer, selectTicket, setSelectedPole, tickets }) {
+  if (loading) return <PageSkeleton rows={2} />;
+  if (error && !poles.length) return <ErrorState detail={error} onRetry={refresh} title="Network map could not load" />;
+
   return (
-    <div className="page-stack">
+    <div className="page-stack" data-tour="map">
       <div className="page-heading">
         <div><span className="eyebrow">Geospatial operations</span><h1>Network map</h1><p>Trace energized paths, missing sensors, and probable fault boundaries.</p></div>
-        <div className="heading-actions"><span className="map-mode"><span className="live-dot" />Schematic mode</span><ActionButton icon="refresh" onClick={refresh} variant="secondary">Refresh map</ActionButton></div>
+        <div className="heading-actions"><span className="map-mode"><span className="live-dot" />Schematic mode <HelpTooltip label="Schematic mode">A topology-first map optimized for radial feeder inspection, not turn-by-turn field routing.</HelpTooltip></span><ActionButton icon="refresh" onClick={refresh} variant="secondary">Refresh map</ActionButton></div>
       </div>
       <div className="map-page-grid">
         <section className="panel map-panel">

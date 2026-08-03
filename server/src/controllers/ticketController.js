@@ -1,4 +1,5 @@
 import Ticket from "../models/Ticket.js";
+import Telemetry from "../models/Telemetry.js";
 import {
   enrichTicketWithRestoration,
   enrichTicketsWithRestoration,
@@ -76,5 +77,37 @@ export async function getTicket(req, res) {
   } catch (err) {
     console.error("Ticket get error:", err.message);
     return res.status(500).json({ error: "Failed to load ticket" });
+  }
+}
+
+export async function getTicketReplay(req, res) {
+  try {
+    const ticket = await Ticket.findOne({ ticket_id: req.params.ticket_id }).select("-__v").lean();
+    if (!ticket) return res.status(404).json({ error: "Ticket not found" });
+
+    const affectedPoleIds = ticket.affected_pole_ids || [];
+    const start = ticket.detected_at
+      ? new Date(new Date(ticket.detected_at).getTime() - 60 * 1000)
+      : new Date(Date.now() - 30 * 60 * 1000);
+    const end = ticket.verified_at || ticket.closed_at || new Date(Date.now() + 60 * 1000);
+    const telemetry = affectedPoleIds.length
+      ? await Telemetry.find({
+          pole_id: { $in: affectedPoleIds },
+          received_at: { $gte: start, $lte: end },
+        })
+          .sort({ received_at: 1 })
+          .limit(250)
+          .select("-__v")
+          .lean()
+      : [];
+
+    return res.json({
+      ticket_id: ticket.ticket_id,
+      window: { start, end },
+      events: telemetry,
+    });
+  } catch (err) {
+    console.error("Ticket replay error:", err.message);
+    return res.status(500).json({ error: "Failed to load incident replay" });
   }
 }

@@ -68,6 +68,71 @@ export async function postRepair(req, res) {
   }
 }
 
+export async function postConfiguredSimulation(req, res) {
+  try {
+    const {
+      fault_type = "span",
+      severity = 50,
+      dt_id,
+      feeder_id,
+      noise = {},
+      repair_after_fault = false,
+    } = req.body;
+    const severityNumber = Math.max(1, Math.min(100, Number(severity) || 50));
+    const fromSeq = Math.max(1, Math.round(12 - severityNumber / 10));
+
+    const faultResult =
+      fault_type === "feeder"
+        ? await injectFeederFault(feeder_id)
+        : fault_type === "transformer"
+          ? await injectTransformerFault(dt_id)
+          : await injectSpanFault(dt_id, fromSeq);
+
+    const noiseResults = [];
+    if (noise.kill_device) noiseResults.push({ type: "offline_device", result: await killDevice(noise.device_id) });
+    if (noise.duplicate_packet) {
+      noiseResults.push({
+        type: "duplicate_packet",
+        result: await generateDuplicateMessage(noise.device_id),
+      });
+    }
+    if (noise.delayed_packet) {
+      noiseResults.push({
+        type: "delayed_packet",
+        result: await generateDelayedMessage(noise.device_id),
+      });
+    }
+
+    const repairResult = repair_after_fault
+      ? fault_type === "feeder"
+        ? await repairFeederFault(feeder_id)
+        : fault_type === "transformer"
+          ? await repairTransformerFault(dt_id)
+          : await repairFault(dt_id, fromSeq)
+      : null;
+
+    res.status(201).json({
+      ...summarizeSimulation(faultResult),
+      configured: {
+        fault_type,
+        severity: severityNumber,
+        from_seq: fromSeq,
+        noise: Object.keys(noise).filter((key) => noise[key] === true),
+        repaired: Boolean(repairResult),
+      },
+      noise_results: noiseResults.map((entry) => ({
+        type: entry.type,
+        applied: entry.result?.applied ?? Boolean(entry.result?.device),
+      })),
+      repair: repairResult ? summarizeSimulation(repairResult) : null,
+      verified: repairResult?.verified || faultResult.verified || [],
+    });
+  } catch (err) {
+    console.error("Configured simulation error:", err.message);
+    res.status(500).json({ error: "Failed to run configured simulation" });
+  }
+}
+
 export async function postScheduledOutage(req, res) {
   try {
     const result = await injectScheduledOutage(req.body.dt_id);

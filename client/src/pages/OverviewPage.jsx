@@ -2,6 +2,7 @@ import ActionButton from "../components/ActionButton.jsx";
 import Icon from "../components/Icon.jsx";
 import IncidentCard from "../components/IncidentCard.jsx";
 import MetricCard from "../components/MetricCard.jsx";
+import { ErrorState, PageSkeleton } from "../components/PageState.jsx";
 import SchematicMap from "../components/SchematicMap.jsx";
 import SignalHealthPanel from "../components/SignalHealthPanel.jsx";
 import Sparkline from "../components/Sparkline.jsx";
@@ -9,10 +10,13 @@ import { cx, formatRelative } from "../utils/format.js";
 
 export default function OverviewPage({
   activeTickets,
+  error,
   focusMode,
   jumpTo,
   lastSync,
+  loading,
   poles,
+  refresh,
   selectTicket,
   selectedPole,
   selectedTransformer,
@@ -25,8 +29,11 @@ export default function OverviewPage({
   tickets,
   transformers,
 }) {
+  if (loading) return <PageSkeleton rows={5} />;
+  if (error && !transformers.length) return <ErrorState detail={error} onRetry={refresh} />;
+
   return (
-    <>
+    <div data-tour="overview">
       <section className="hero-panel">
         <div className="hero-copy">
           <div className="hero-eyebrow"><span className="live-dot" />Shift overview - {lastSync ? `synced ${formatRelative(lastSync)}` : "connecting"}</div>
@@ -48,11 +55,11 @@ export default function OverviewPage({
       </section>
 
       <section className="metric-grid">
-        <MetricCard accent="coral" detail={activeTickets.length ? `${activeTickets.filter((ticket) => ticket.fault_type !== "span").length} wide-area` : "No active response required"} icon="alert" label="Active incidents" onClick={() => jumpTo("Tickets")} value={stats.active_faults ?? 0} />
-        <MetricCard accent="amber" detail={stats.critical_faults ? "Crew attention required" : "No critical events"} icon="bolt" label="Critical exposure" value={stats.critical_faults ?? 0} />
-        <MetricCard accent="blue" detail={selectedTransformer ? `${selectedTransformer.dt_id} in focus` : "Select a transformer"} icon="satellite" label="Devices offline" value={stats.devices_offline ?? 0} />
-        <MetricCard accent="violet" detail={selectedTransformer ? `${selectedTransformer.pole_count || 0} poles in slice` : "Network wide"} icon="map" label="Poles without power" value={stats.affected_poles ?? 0} />
-        <MetricCard accent="mint" detail={`${signalContinuity}% packets applied cleanly`} icon="pulse" label="Signal continuity" value={`${signalContinuity}%`} />
+        <MetricCard accent="coral" detail={activeTickets.length ? `${activeTickets.filter((ticket) => ticket.fault_type !== "span").length} wide-area` : "No active response required"} help="Open tickets that have not yet been verified or closed." icon="alert" label="Active incidents" onClick={() => jumpTo("Tickets")} value={stats.active_faults ?? 0} />
+        <MetricCard accent="amber" detail={stats.critical_faults ? "Crew attention required" : "No critical events"} help="Feeder or transformer events, plus span faults affecting many poles." icon="bolt" label="Critical exposure" value={stats.critical_faults ?? 0} />
+        <MetricCard accent="blue" detail={selectedTransformer ? `${selectedTransformer.dt_id} in focus` : "Select a transformer"} help="Devices whose last signal is older than the offline threshold. This is sensor health, not proof of an outage." icon="satellite" label="Devices offline" value={stats.devices_offline ?? 0} />
+        <MetricCard accent="violet" detail={selectedTransformer ? `${selectedTransformer.pole_count || 0} poles in slice` : "Network wide"} help="Poles currently marked de-energized from applied telemetry." icon="map" label="Poles without power" value={stats.affected_poles ?? 0} />
+        <MetricCard accent="mint" detail={`${signalContinuity}% packets applied cleanly`} help="Share of recent packets accepted after duplicate and stale-message checks." icon="pulse" label="Signal continuity" value={`${signalContinuity}%`} />
       </section>
 
       <div className="dashboard-grid">
@@ -88,6 +95,6 @@ export default function OverviewPage({
           <div className="focus-note"><Icon name="spark" size={15} /><span>Focus mode narrows the screen to one transformer and its connected poles.</span><button aria-label="Enable focus mode" onClick={() => setFocusMode((mode) => !mode)} type="button">{focusMode ? "On" : "Turn on"}</button></div>
         </section>
       </div>
-    </>
+    </div>
   );
 }
