@@ -12,6 +12,7 @@ import SimulationPage from "./pages/SimulationPage.jsx";
 import TelemetryPage from "./pages/TelemetryPage.jsx";
 import TicketsPage from "./pages/TicketsPage.jsx";
 import { cx, formatTime, readableError, statusLabel } from "./utils/format.js";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 
 function App() {
   const [activeTab, setActiveTab] = useState("Dashboard");
@@ -273,7 +274,9 @@ function App() {
               <button aria-label="Dismiss message" onClick={() => { setError(""); setNotice(""); }} type="button"><Icon name="close" size={15} /></button>
             </div>
           )}
-          {renderContent()}
+          <ErrorBoundary key={activeTab}>
+            {renderContent()}
+          </ErrorBoundary>
         </main>
       </section>
 

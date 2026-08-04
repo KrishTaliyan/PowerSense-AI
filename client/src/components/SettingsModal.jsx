@@ -33,3 +33,7 @@ export default function SettingsModal({ onClose, onRestartTour, theme, setTheme 
     </div>
   );
 }
+
+
+
+

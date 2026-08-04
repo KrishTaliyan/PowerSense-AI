@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ActionButton from "./ActionButton.jsx";
 import Icon from "./Icon.jsx";
 
@@ -35,28 +35,70 @@ const steps = [
   },
 ];
 
+const MAX_WAIT_MS = 2000;
+const POLL_INTERVAL_MS = 60;
+
 export default function ProductTour({ active, onClose, onNavigate }) {
   const [index, setIndex] = useState(0);
   const step = steps[index];
+  const pollRef = useRef(null);
 
   useEffect(() => {
     if (!active) return undefined;
+
     onNavigate(step.view);
-    const timer = window.setTimeout(() => {
-      document.querySelector(step.target)?.classList.add("tour-highlight");
-    }, 80);
-    return () => {
-      window.clearTimeout(timer);
+
+    let elapsed = 0;
+    let cancelled = false;
+
+    function clearHighlights() {
       document.querySelectorAll(".tour-highlight").forEach((node) => node.classList.remove("tour-highlight"));
+    }
+
+    function tryHighlight() {
+      if (cancelled) return;
+      clearHighlights();
+      const el = document.querySelector(step.target);
+      if (el) {
+        el.classList.add("tour-highlight");
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+      elapsed += POLL_INTERVAL_MS;
+      if (elapsed < MAX_WAIT_MS) {
+        pollRef.current = window.setTimeout(tryHighlight, POLL_INTERVAL_MS);
+      }
+    }
+
+    // Give the view a moment to start navigating, then poll until it exists.
+    pollRef.current = window.setTimeout(tryHighlight, 50);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(pollRef.current);
+      clearHighlights();
     };
-  }, [active, onNavigate, step]);
+  }, [active, index, onNavigate, step]);
 
   const progress = useMemo(() => `${index + 1} / ${steps.length}`, [index]);
   if (!active) return null;
 
   function finish() {
     window.localStorage.setItem("powersense-tour-complete", "true");
+    setIndex(0);
     onClose();
+  }
+
+  function goBack() {
+    setIndex((current) => Math.max(0, current - 1));
+  }
+
+  function goNext() {
+    if (index === steps.length - 1) {
+      finish();
+    } else {
+      setIndex((current) => current + 1);
+    }
   }
 
   return (
@@ -70,8 +112,8 @@ export default function ProductTour({ active, onClose, onNavigate }) {
         <h2>{step.title}</h2>
         <p>{step.detail}</p>
         <div className="tour-actions">
-          <ActionButton disabled={index === 0} onClick={() => setIndex((current) => Math.max(0, current - 1))} variant="ghost">Back</ActionButton>
-          <ActionButton icon={index === steps.length - 1 ? "check" : "arrow"} onClick={() => index === steps.length - 1 ? finish() : setIndex((current) => current + 1)} variant="primary">
+          <ActionButton disabled={index === 0} onClick={goBack} variant="ghost">Back</ActionButton>
+          <ActionButton icon={index === steps.length - 1 ? "check" : "arrow"} onClick={goNext} variant="primary">
             {index === steps.length - 1 ? "Finish" : "Next"}
           </ActionButton>
         </div>

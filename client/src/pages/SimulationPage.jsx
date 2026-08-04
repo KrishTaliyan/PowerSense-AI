@@ -1,15 +1,45 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ActionButton from "../components/ActionButton.jsx";
 import HelpTooltip from "../components/HelpTooltip.jsx";
 import Icon from "../components/Icon.jsx";
 import { ErrorState, PageSkeleton } from "../components/PageState.jsx";
 import { cx } from "../utils/format.js";
 
+const EXPECTED_DURATION_MS = 12000; // tune this to your typical real response time
+
 export default function SimulationPage({ busy, error, feederId, fromSeq, loading, post, refresh, selectedDt }) {
   const [faultType, setFaultType] = useState("span");
   const [severity, setSeverity] = useState(55);
   const [noise, setNoise] = useState({ duplicate_packet: true, delayed_packet: false, kill_device: false });
   const [repairAfterFault, setRepairAfterFault] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const wasBusyRef = useRef(false);
+
+  useEffect(() => {
+    if (busy) {
+      wasBusyRef.current = true;
+      const start = Date.now();
+      setProgress(3);
+      const interval = window.setInterval(() => {
+        const elapsed = Date.now() - start;
+        // Approaches 92% asymptotically — never claims done until the response actually lands.
+        const pct = 92 * (1 - Math.exp(-elapsed / EXPECTED_DURATION_MS));
+        setProgress(Math.min(92, Math.round(pct)));
+      }, 150);
+      return () => window.clearInterval(interval);
+    }
+
+    if (wasBusyRef.current) {
+      setProgress(100);
+      const timeout = window.setTimeout(() => {
+        setProgress(0);
+        wasBusyRef.current = false;
+      }, 600);
+      return () => window.clearTimeout(timeout);
+    }
+
+    return undefined;
+  }, [busy]);
 
   const faultActions = [
     { title: "Span fault", description: "Break a single downstream span and localize the boundary.", icon: "bolt", variant: "danger", path: "/simulate/span-fault", body: { dt_id: selectedDt, from_seq: fromSeq } },
@@ -68,9 +98,20 @@ export default function SimulationPage({ busy, error, feederId, fromSeq, loading
         <section className="panel scenario-panel">
           <div className="panel-header"><div><span className="eyebrow">Practice safely</span><h2>Try a scenario and watch the grid respond.</h2></div><span className="lab-badge"><Icon name="spark" size={14} /> Ready to try</span></div>
           <p className="panel-intro">These actions create realistic device messages. Use them to learn the full response: find the problem, send a crew, repair the line, and confirm power is back.</p>
+          {(busy || progress > 0) && (
+            <div className="sim-progress" role="status" aria-live="polite">
+              <div className="sim-progress-head">
+                <span>{busy ? "Running scenario — updating telemetry and tickets…" : "Done"}</span>
+                <span className="sim-progress-percent">{progress}%</span>
+              </div>
+              <div className="sim-progress-track">
+                <div className="sim-progress-fill" style={{ width: `${progress}%` }} />
+              </div>
+            </div>
+          )}
           <div className="scenario-section">
             <span className="section-kicker">Configured incident run</span>
-            <div className="sim-config">
+            <fieldset className="sim-config" disabled={busy} style={{ border: 0, padding: 0, margin: 0 }}>
               <label>
                 <span>Fault type <HelpTooltip label="Fault type">Choose the outage pattern the deterministic localizer must distinguish.</HelpTooltip></span>
                 <select onChange={(event) => setFaultType(event.target.value)} value={faultType}>
@@ -94,8 +135,10 @@ export default function SimulationPage({ busy, error, feederId, fromSeq, loading
                 <input checked={repairAfterFault} onChange={() => setRepairAfterFault((value) => !value)} type="checkbox" />
                 <span>Run repair simulation after fault</span>
               </label>
-              <ActionButton disabled={busy || !selectedDt || (faultType === "feeder" && !feederId)} icon="play" onClick={runConfiguredScenario} variant="primary">Run configured scenario</ActionButton>
-            </div>
+              <ActionButton disabled={busy || !selectedDt || (faultType === "feeder" && !feederId)} icon={busy ? undefined : "play"} onClick={runConfiguredScenario} variant="primary">
+                {busy ? `Running… ${progress}%` : "Run configured scenario"}
+              </ActionButton>
+            </fieldset>
           </div>
           <div className="scenario-section"><span className="section-kicker">Create a power problem</span><div className="scenario-grid">{faultActions.map((action) => renderScenarioCard(action, action.variant, !selectedDt || (action.path.includes("feeder") && !feederId)))}</div></div>
           <div className="scenario-section"><span className="section-kicker">Bring power back</span><div className="scenario-grid">{repairActions.map((action) => renderScenarioCard(action, "mint", !selectedDt || (action.body.scope === "feeder" && !feederId)))}</div></div>

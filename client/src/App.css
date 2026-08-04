@@ -1674,3 +1674,249 @@ button:disabled { cursor: not-allowed; }
     margin: 0;
   }
 }
+/* Light-theme contrast fix pass */
+.light-theme .sim-config label,
+.light-theme .noise-options {
+  color: #43614f;
+}
+
+.light-theme .sim-config label > span,
+.light-theme .noise-options > span {
+  color: #22402e;
+}
+
+.light-theme .noise-options label,
+.light-theme .repair-toggle {
+  color: #385647;
+}
+
+.light-theme .eyebrow,
+.light-theme .sidebar-section-label,
+.light-theme .section-kicker {
+  color: #4d6a5a;
+}
+
+.light-theme .metric-detail,
+.light-theme .page-heading p,
+.light-theme .panel-intro,
+.light-theme .hero-copy p,
+.light-theme .focus-facts span,
+.light-theme .node-facts span,
+.light-theme .detail-grid span,
+.light-theme .drawer-section p,
+.light-theme .queue-guide span,
+.light-theme .lab-callout span,
+.light-theme .telemetry-summary,
+.light-theme .table-sub,
+.light-theme .incident-type > div > span,
+.light-theme .incident-summary,
+.light-theme .incident-card-meta,
+.light-theme .scenario-card small,
+.light-theme .playbook-steps p,
+.light-theme .confidence-factor span,
+.light-theme .replay-event span,
+.light-theme .drawer-hero span:not(.status-pill),
+.light-theme .node-insight-head span,
+.light-theme .state-card span,
+.light-theme .tour-card p,
+.light-theme .settings-row > div > span,
+.light-theme .ai-summary-panel p,
+.light-theme .action-panel p,
+.light-theme .evidence-list div,
+.light-theme .replay-empty,
+.light-theme .mini-loading {
+  color: #4a6459;
+}
+
+/* Dark-theme surface lightening pass */
+:root {
+  background: #15191a;
+}
+
+.app-shell,
+.workspace {
+  background: #15191a;
+}
+
+.workspace {
+  background:
+    linear-gradient(180deg, rgb(124 228 189 / 3%), transparent 280px),
+    #15191a;
+}
+
+.sidebar {
+  background: #1a211d;
+}
+
+.topbar {
+  background: rgb(21 25 26 / 88%);
+}
+
+.network-status {
+  background: linear-gradient(145deg, #1c2b24, #1a221e);
+}
+
+.operator-chip {
+  background: #1f2a24;
+}
+
+.command-button,
+.focus-button,
+.icon-button,
+.theme-toggle,
+.metric-card,
+.panel {
+  background: #1c2421;
+}
+
+.hero-panel {
+  background: radial-gradient(circle at 75% 46%, rgb(53 102 80 / 22%), transparent 32%), linear-gradient(115deg, #202f28, #182e22 54%, #1a2f24);
+}
+
+.network-map {
+  background: #182b21;
+}
+
+.map-grid::after {
+  background: radial-gradient(circle at 50% 50%, transparent, #16241d 87%);
+}
+
+.incident-card {
+  background: #1f2921;
+}
+
+.search-field,
+.select-compact {
+  background: #1f2921;
+}
+
+.data-table th {
+  background: #1a221e;
+}
+
+.data-table tbody tr:not(:last-child):hover {
+  background: #212c26;
+}
+
+.scenario-card {
+  background: #202b23;
+}
+
+.ticket-drawer {
+  background: #1b2420;
+}
+
+.command-palette {
+  background: #1e2822;
+}
+
+.toast-success {
+  background: #1a3226;
+}
+
+.toast-error {
+  background: #33201d;
+}
+
+.tour-card,
+.settings-modal {
+  background: #1c2621;
+}
+
+.settings-row {
+  background: #202b24;
+}
+
+.ai-summary-panel,
+.confidence-breakdown,
+.replay-panel {
+  background: #1f2f26;
+}
+
+.confidence-factor,
+.confidence-breakdown-compact,
+.replay-event {
+  background: #1e2822;
+}
+
+.sim-config {
+  background: #202b24;
+}
+
+.skeleton-hero,
+.skeleton-card,
+.skeleton-panel,
+.skeleton-row span,
+.mini-loading span {
+  background: #202a25;
+}
+
+.sim-progress {
+  margin: 0 21px 22px;
+  padding: 13px 15px;
+  border: 1px solid #2c4a3a;
+  border-radius: 8px;
+  background: #16281f;
+}
+
+.sim-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #bfe2cd;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sim-progress-percent {
+  color: #7ce4bd;
+  font: 13px 'DM Mono', monospace;
+}
+
+.sim-progress-track {
+  height: 7px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #23392e;
+}
+
+.sim-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4fa87f, #7ce4bd);
+  border-radius: inherit;
+  transition: width .25s ease-out;
+}
+
+.light-theme .sim-progress {
+  border-color: #c6dfce;
+  background: #eef9f2;
+}
+
+.light-theme .sim-progress-head {
+  color: #2a5e42;
+}
+
+.light-theme .sim-progress-track {
+  background: #d9ecdf;
+}
+
+.sim-config .repair-toggle {
+  display: flex;
+  grid-column: 1 / -1;
+  align-items: center;
+  align-self: start;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.sim-config .repair-toggle > span {
+  color: #9aafa3;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.light-theme .sim-config .repair-toggle > span {
+  color: #43614f;
+}
