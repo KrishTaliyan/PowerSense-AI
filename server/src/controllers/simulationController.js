@@ -1,7 +1,9 @@
 import {
   generateDelayedMessage,
   generateDuplicateMessage,
+  generateMissingTelemetry,
   injectFeederFault,
+  injectMultipleFaults,
   injectScheduledOutage,
   injectSpanFault,
   injectTransformerFault,
@@ -9,6 +11,7 @@ import {
   repairFault,
   repairFeederFault,
   repairTransformerFault,
+  simulateLegacyFirmwareDevice,
 } from "../simulation/simulateFault.js";
 
 function summarizeSimulation(result) {
@@ -89,16 +92,34 @@ export async function postConfiguredSimulation(req, res) {
           : await injectSpanFault(dt_id, fromSeq);
 
     const noiseResults = [];
+    if (noise.multiple_faults) {
+      noiseResults.push({
+        type: "multiple_faults",
+        result: await injectMultipleFaults(dt_id, feeder_id),
+      });
+    }
     if (noise.kill_device) noiseResults.push({ type: "offline_device", result: await killDevice(noise.device_id) });
+    if (noise.missing_telemetry) {
+      noiseResults.push({
+        type: "missing_telemetry",
+        result: await generateMissingTelemetry(noise.device_id),
+      });
+    }
+    if (noise.firmware_12_device) {
+      noiseResults.push({
+        type: "firmware_1_2_device",
+        result: await simulateLegacyFirmwareDevice(noise.device_id),
+      });
+    }
     if (noise.duplicate_packet) {
       noiseResults.push({
         type: "duplicate_packet",
         result: await generateDuplicateMessage(noise.device_id),
       });
     }
-    if (noise.delayed_packet) {
+    if (noise.delayed_packet || noise.out_of_order_telemetry) {
       noiseResults.push({
-        type: "delayed_packet",
+        type: "out_of_order_telemetry",
         result: await generateDelayedMessage(noise.device_id),
       });
     }
@@ -122,7 +143,7 @@ export async function postConfiguredSimulation(req, res) {
       },
       noise_results: noiseResults.map((entry) => ({
         type: entry.type,
-        applied: entry.result?.applied ?? Boolean(entry.result?.device),
+        applied: entry.result?.applied ?? Boolean(entry.result?.device || entry.result?.tickets?.length),
       })),
       repair: repairResult ? summarizeSimulation(repairResult) : null,
       verified: repairResult?.verified || faultResult.verified || [],
@@ -150,6 +171,45 @@ export async function postKillDevice(req, res) {
   } catch (err) {
     console.error("Kill device simulation error:", err.message);
     res.status(500).json({ error: "Failed to kill device" });
+  }
+}
+
+export async function postMissingTelemetry(req, res) {
+  try {
+    const result = await generateMissingTelemetry(req.body.device_id);
+    res.status(201).json({
+      device_id: result.device?.device_id,
+      applied: result.applied,
+      suppressed_reason: result.suppressed_reason,
+    });
+  } catch (err) {
+    console.error("Missing telemetry simulation error:", err.message);
+    res.status(500).json({ error: "Failed to simulate missing telemetry" });
+  }
+}
+
+export async function postFirmware12Device(req, res) {
+  try {
+    const result = await simulateLegacyFirmwareDevice(req.body.device_id);
+    res.status(201).json({
+      device_id: result.device?.device_id,
+      firmware: result.device?.fw,
+      applied: result.applied,
+      suppressed_reason: result.suppressed_reason,
+    });
+  } catch (err) {
+    console.error("Firmware 1.2 simulation error:", err.message);
+    res.status(500).json({ error: "Failed to simulate firmware 1.2 device" });
+  }
+}
+
+export async function postMultipleFaults(req, res) {
+  try {
+    const result = await injectMultipleFaults(req.body.dt_id, req.body.feeder_id);
+    res.status(201).json(summarizeSimulation(result));
+  } catch (err) {
+    console.error("Multiple fault simulation error:", err.message);
+    res.status(500).json({ error: "Failed to inject multiple simultaneous faults" });
   }
 }
 

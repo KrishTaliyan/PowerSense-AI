@@ -231,6 +231,61 @@ async function killDevice(deviceId) {
   return { device };
 }
 
+async function generateMissingTelemetry(deviceId) {
+  const device = deviceId
+    ? await Device.findOne({ device_id: deviceId })
+    : await Device.findOne().sort({ last_seen_at: -1 });
+  if (!device) return { device: null, applied: false };
+
+  device.last_seen_at = new Date(Date.now() - 45 * 60 * 1000);
+  await device.save();
+  return {
+    device,
+    applied: false,
+    suppressed_reason: "missing_telemetry",
+  };
+}
+
+async function simulateLegacyFirmwareDevice(deviceId) {
+  const device = deviceId
+    ? await Device.findOne({ device_id: deviceId })
+    : await Device.findOne({ is_legacy_firmware: true }).sort({ last_seen_at: -1 }) ||
+      await Device.findOne().sort({ last_seen_at: -1 });
+  if (!device) return { device: null, applied: false };
+
+  device.fw = "1.2.4";
+  device.is_legacy_firmware = true;
+  device.last_seen_at = new Date(Date.now() - 35 * 60 * 1000);
+  await device.save();
+  return {
+    device,
+    applied: false,
+    suppressed_reason: "firmware_1_2_missing_power_lost_event",
+  };
+}
+
+async function injectMultipleFaults(dtId, feederId) {
+  const primary = await injectSpanFault(dtId, 5);
+  const secondaryTarget = await Transformer.findOne({
+    ...(feederId ? { feeder_id: feederId } : {}),
+    ...(primary.target?.dt_id ? { dt_id: { $ne: primary.target.dt_id } } : {}),
+    has_known_topology: true,
+  }).sort({ dt_id: 1 });
+  const secondary = secondaryTarget
+    ? await injectSpanFault(secondaryTarget.dt_id, 7)
+    : await injectTransformerFault(dtId);
+
+  return {
+    target: {
+      primary: primary.target,
+      secondary: secondary.target,
+      feeder_id: feederId || primary.target?.feeder_id || secondary.target?.feeder_id || null,
+    },
+    telemetry: [...(primary.telemetry || []), ...(secondary.telemetry || [])],
+    tickets: [...(primary.tickets || []), ...(secondary.tickets || [])].filter(Boolean),
+  };
+}
+
 async function generateDuplicateMessage(deviceId) {
   const device = deviceId
     ? await Device.findOne({ device_id: deviceId })
@@ -272,7 +327,9 @@ async function generateDelayedMessage(deviceId) {
 export {
   generateDelayedMessage,
   generateDuplicateMessage,
+  generateMissingTelemetry,
   injectFeederFault,
+  injectMultipleFaults,
   injectScheduledOutage,
   injectSpanFault,
   injectTransformerFault,
@@ -280,4 +337,5 @@ export {
   repairFault,
   repairFeederFault,
   repairTransformerFault,
+  simulateLegacyFirmwareDevice,
 };

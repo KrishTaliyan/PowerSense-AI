@@ -12,6 +12,7 @@ import {
   formatDate,
   locationLabel,
   restorationCopy,
+  statusLabel,
   suggestedOperatorAction,
 } from "../utils/format.js";
 
@@ -36,11 +37,17 @@ export default function TicketDrawer({ ticket, onClose, onStatus }) {
         </div>
         <div className="detail-grid">
           <div><span>Fault location</span><strong>{locationLabel(ticket.localization_level)}</strong></div>
+          <div><span>Detection time</span><strong>{formatDate(ticket.detected_at)}</strong></div>
           <div><span>Estimated fault span</span><strong>{estimatedFaultSpan(ticket)}</strong></div>
           <div><span>Affected poles</span><strong>{ticket.affected_pole_count || 0}</strong></div>
+          <div><span>Coordinates</span><strong>{ticket.lat && ticket.lon ? `${Number(ticket.lat).toFixed(5)}, ${Number(ticket.lon).toFixed(5)}` : "-"}</strong></div>
           <div><span>PIN code</span><strong>{ticket.pincode || "Not available"}</strong></div>
+          <div><span>Feeder</span><strong>{ticket.feeder_id || "-"}</strong></div>
+          <div><span>Transformer</span><strong>{ticket.dt_id || "-"}</strong></div>
           <div><span>Last live pole</span><strong>{ticket.last_live_pole_id || "-"}</strong></div>
           <div><span>First dark pole</span><strong>{ticket.first_dark_pole_id || "-"}</strong></div>
+          <div><span>Restoration status</span><strong>{restoration.title}</strong></div>
+          <div><span>Verification status</span><strong>{ticket.verified_at ? `Verified ${formatDate(ticket.verified_at)}` : statusLabel(ticket.status)}</strong></div>
         </div>
         <div className="drawer-section evidence-panel">
           <span className="drawer-section-title">Evidence</span>
@@ -48,6 +55,7 @@ export default function TicketDrawer({ ticket, onClose, onStatus }) {
             <div><Icon name="target" size={15} /><span>{ticket.confidence_reason || "Boundary inferred from live and dark pole telemetry."}</span></div>
             <div><Icon name="pulse" size={15} /><span>{ticket.remaining_dark_poles || 0} affected pole{ticket.remaining_dark_poles === 1 ? "" : "s"} still need live telemetry before verification.</span></div>
             <div><Icon name="map" size={15} /><span>{ticket.localization_level === "dt" ? "Topology missing, so the UI reports an honest range." : "Topology supports the displayed fault boundary."}</span></div>
+            <div><Icon name="shield" size={15} /><span>Telemetry evidence covers {ticket.affected_pole_count || 0} affected pole{ticket.affected_pole_count === 1 ? "" : "s"} and uses duplicate/stale filtering before any state change is trusted.</span></div>
           </div>
         </div>
         <ConfidenceBreakdown ticket={ticket} />

@@ -2,11 +2,13 @@ import Icon from "./Icon.jsx";
 import { cx, formatDate } from "../utils/format.js";
 
 const timelineStages = [
-  { id: "detection", label: "Detection", field: "detected_at", fallback: true },
-  { id: "localization", label: "Localization", field: "detected_at", fallback: true },
+  { id: "detected", label: "Detected", field: "detected_at", fallback: true },
+  { id: "localized", label: "Localized", field: "detected_at", fallback: true },
+  { id: "acknowledged", label: "Acknowledged", field: "acknowledged_at" },
   { id: "crew", label: "Crew Assigned", field: "crew_assigned_at" },
   { id: "resolved", label: "Resolved", field: "resolved_at" },
   { id: "verified", label: "Verified", field: "verified_at" },
+  { id: "closed", label: "Closed", field: "closed_at" },
 ];
 
 export default function IncidentTimeline({ ticket }) {
