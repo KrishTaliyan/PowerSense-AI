@@ -160,6 +160,7 @@ function App() {
 
   const selectTicket = useCallback((ticket) => {
     setSelectedTicket(ticket);
+    if (ticket?.dt_id) setSelectedDt(ticket.dt_id);
   }, []);
 
   const selectTransformer = useCallback((transformer) => {
@@ -189,6 +190,7 @@ function App() {
           error={error}
           loading={initialLoading}
           selectedPole={selectedPole}
+          focusTicket={selectedTicketForDrawer}
           selectedTransformer={selectedTransformer}
           selectTicket={selectTicket}
           setSelectedPole={setSelectedPole}

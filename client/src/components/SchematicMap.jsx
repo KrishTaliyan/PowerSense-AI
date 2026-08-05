@@ -1,75 +1,222 @@
-import { useCallback, useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
 import Icon from "./Icon.jsx";
 import { cx } from "../utils/format.js";
 
-export default function SchematicMap({ poles, tickets, transformer, selectedPoleId, onSelectPole, onSelectTicket }) {
-  const mapPoles = useMemo(() => {
-    if (poles.length <= 420) return poles;
-    const stride = Math.ceil(poles.length / 420);
-    return poles.filter((_, index) => index % stride === 0);
-  }, [poles]);
+const mapAttribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
+function isOpen(ticket) {
+  return ticket && !["verified", "closed"].includes(ticket.status);
+}
+
+function validPoint(entity) {
+  return Number.isFinite(Number(entity?.lat)) && Number.isFinite(Number(entity?.lon));
+}
+
+function point(entity) {
+  return [Number(entity.lat), Number(entity.lon)];
+}
+
+function pinHtml(className, label = "") {
+  return `<span class="${className}">${label}</span>`;
+}
+
+function markerIcon(className, label = "", size = 26) {
+  return L.divIcon({
+    className: "ps-leaflet-icon",
+    html: pinHtml(className, label),
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2],
+  });
+}
+
+const transformerIcon = markerIcon("leaflet-transformer", "DT", 32);
+const faultIcon = markerIcon("leaflet-fault", "!", 34);
+const boundaryIcon = markerIcon("leaflet-boundary", "", 18);
+
+function MapViewport({ bounds, focusTicket, selectedPole }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (focusTicket && validPoint(focusTicket)) {
+      map.flyTo(point(focusTicket), Math.max(map.getZoom(), 17), { duration: 0.85 });
+      return;
+    }
+
+    if (selectedPole && validPoint(selectedPole)) {
+      map.flyTo(point(selectedPole), Math.max(map.getZoom(), 17), { duration: 0.75 });
+      return;
+    }
+
+    if (bounds?.length) {
+      map.fitBounds(bounds, { padding: [34, 34], maxZoom: 16, animate: true, duration: 0.65 });
+    }
+  }, [bounds, focusTicket, map, selectedPole]);
+
+  return null;
+}
+
+function PopupFacts({ pole, transformer }) {
+  const feeder = pole.feeder_id || transformer?.feeder_id || "-";
+  const transformerId = pole.dt_id || transformer?.dt_id || "-";
+  const status = pole.is_transformer
+    ? pole.is_energized === false ? "De-energized transformer" : "Energized transformer"
+    : pole.device_id
+      ? pole.is_energized ? "Energized pole" : "De-energized pole"
+      : "No device installed";
+
+  return (
+    <div className="map-popup">
+      <strong>{pole.pole_id || pole.dt_id}</strong>
+      <span>Pole ID: {pole.is_transformer ? "-" : pole.pole_id}</span>
+      <span>Transformer: {transformerId}</span>
+      <span>Feeder: {feeder}</span>
+      <span>Status: {status}</span>
+      <span>Coordinates: {Number(pole.lat).toFixed(5)}, {Number(pole.lon).toFixed(5)}</span>
+      <span>PIN Code: {pole.pincode || transformer?.pincode || "Not available"}</span>
+    </div>
+  );
+}
+
+function IncidentPopup({ ticket }) {
+  return (
+    <div className="map-popup">
+      <strong>{ticket.ticket_id}</strong>
+      <span>Pole ID: {ticket.first_dark_pole_id || ticket.last_live_pole_id || "-"}</span>
+      <span>Transformer: {ticket.dt_id || "-"}</span>
+      <span>Feeder: {ticket.feeder_id || "-"}</span>
+      <span>Status: {ticket.status}</span>
+      <span>Coordinates: {Number(ticket.lat).toFixed(5)}, {Number(ticket.lon).toFixed(5)}</span>
+      <span>PIN Code: {ticket.pincode || "Not available"}</span>
+    </div>
+  );
+}
+
+export default function SchematicMap({
+  focusTicket,
+  onSelectPole,
+  onSelectTicket,
+  poles,
+  selectedPoleId,
+  tickets,
+  transformer,
+}) {
+  const mapPoles = useMemo(() => poles.filter(validPoint), [poles]);
+  const poleById = useMemo(() => new Map(mapPoles.map((pole) => [pole.pole_id, pole])), [mapPoles]);
+  const activeTickets = useMemo(() => tickets.filter((ticket) => isOpen(ticket) && validPoint(ticket)), [tickets]);
+  const criticalTicket = useMemo(() => (
+    activeTickets.find((ticket) => ticket.fault_type === "feeder")
+    || activeTickets.find((ticket) => ticket.fault_type === "transformer")
+    || activeTickets[0]
+  ), [activeTickets]);
+  const ticketInView = focusTicket && validPoint(focusTicket) ? focusTicket : criticalTicket;
   const bounds = useMemo(() => {
-    if (!mapPoles.length) return null;
-    const lats = mapPoles.map((pole) => pole.lat);
-    const lons = mapPoles.map((pole) => pole.lon);
-    return { minLat: Math.min(...lats), maxLat: Math.max(...lats), minLon: Math.min(...lons), maxLon: Math.max(...lons) };
-  }, [mapPoles]);
+    const entities = [...mapPoles, ...(validPoint(transformer) ? [transformer] : []), ...activeTickets].filter(validPoint);
+    return entities.map(point);
+  }, [activeTickets, mapPoles, transformer]);
+  const center = useMemo(() => {
+    if (ticketInView && validPoint(ticketInView)) return point(ticketInView);
+    if (validPoint(transformer)) return point(transformer);
+    if (mapPoles[0]) return point(mapPoles[0]);
+    return [28.6139, 77.2090];
+  }, [mapPoles, ticketInView, transformer]);
+  const links = useMemo(() => (
+    mapPoles.flatMap((pole) => {
+      const parent = pole.parent_pole_id ? poleById.get(pole.parent_pole_id) : null;
+      return parent ? [{ id: `${parent.pole_id}-${pole.pole_id}`, points: [point(parent), point(pole)], dark: !parent.is_energized || !pole.is_energized }] : [];
+    })
+  ), [mapPoles, poleById]);
+  const boundaryPairs = useMemo(() => (
+    activeTickets.flatMap((ticket) => {
+      const live = ticket.last_live_pole_id ? poleById.get(ticket.last_live_pole_id) : null;
+      const dark = ticket.first_dark_pole_id ? poleById.get(ticket.first_dark_pole_id) : null;
+      return live && dark ? [{ id: ticket.ticket_id, points: [point(live), point(dark)] }] : [];
+    })
+  ), [activeTickets, poleById]);
 
-  const positionFor = useCallback((lat, lon) => {
-    if (!bounds || lat == null || lon == null) return null;
-    const latRange = bounds.maxLat - bounds.minLat || 1;
-    const lonRange = bounds.maxLon - bounds.minLon || 1;
-    return { x: 5 + ((lon - bounds.minLon) / lonRange) * 90, y: 95 - ((lat - bounds.minLat) / latRange) * 90 };
-  }, [bounds]);
-
-  const positionedPoles = useMemo(() => mapPoles.map((pole) => ({ ...pole, point: positionFor(pole.lat, pole.lon) })).filter((pole) => pole.point), [mapPoles, positionFor]);
-  const positions = useMemo(() => new Map(positionedPoles.map((pole) => [pole.pole_id, pole.point])), [positionedPoles]);
-  const links = useMemo(() => positionedPoles.flatMap((pole) => {
-    const parent = pole.parent_pole_id ? positions.get(pole.parent_pole_id) : null;
-    return parent ? [{ from: parent, to: pole.point, key: `${pole.parent_pole_id}-${pole.pole_id}` }] : [];
-  }), [positionedPoles, positions]);
-  const activeTickets = tickets.filter((ticket) => ticket.lat && ticket.lon && !["verified", "closed"].includes(ticket.status));
-
-  if (!mapPoles.length || !bounds) {
+  if (!mapPoles.length && !validPoint(transformer)) {
     return <div className="empty-map"><Icon name="map" size={28} /><strong>No network slice loaded</strong><span>Select a transformer to focus the map.</span></div>;
   }
 
   return (
-    <div className="network-map">
-      <div className="map-grid" />
-      <div className="map-topbar"><div><span className="eyebrow">Live network view</span><strong>{transformer?.dt_id || "Selected transformer"}</strong></div><span className="map-count"><span className="live-dot" />{positionedPoles.length} poles in view</span></div>
-      <svg className="map-connections" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-        {links.map((link) => <line key={link.key} x1={link.from.x} y1={link.from.y} x2={link.to.x} y2={link.to.y} />)}
-      </svg>
-      {positionedPoles.map((pole) => (
-        <button
-          aria-label={`${pole.pole_id}, ${pole.is_energized ? "live" : "dark"}`}
-          className={cx("map-node", pole.is_energized ? "node-live" : "node-dark", !pole.device_id && "node-missing", selectedPoleId === pole.pole_id && "node-selected")}
-          key={pole.pole_id}
-          onClick={() => onSelectPole(pole)}
-          style={{ left: `${pole.point.x}%`, top: `${pole.point.y}%` }}
-          title={`${pole.pole_id} - ${pole.is_energized ? "live" : "dark"}`}
-          type="button"
-        />
-      ))}
-      {transformer && positionFor(transformer.lat, transformer.lon) && (
-        <button
-          aria-label={`${transformer.dt_id} transformer`}
-          className="transformer-node"
-          onClick={() => onSelectPole({ ...transformer, pole_id: transformer.dt_id, is_transformer: true })}
-          style={{ left: `${positionFor(transformer.lat, transformer.lon).x}%`, top: `${positionFor(transformer.lat, transformer.lon).y}%` }}
-          title={`${transformer.dt_id} - ${transformer.capacity_kva || "-"} kVA`}
-          type="button"
-        ><Icon name="bolt" size={14} /></button>
-      )}
-      {activeTickets.map((ticket) => {
-        const point = positionFor(ticket.lat, ticket.lon);
-        if (!point) return null;
-        return <button aria-label={`Open ${ticket.ticket_id}`} className="fault-node" key={ticket.ticket_id} onClick={() => onSelectTicket(ticket)} style={{ left: `${point.x}%`, top: `${point.y}%` }} type="button"><Icon name="alert" size={13} /></button>;
-      })}
-      <div className="map-legend"><span><i className="legend-swatch swatch-live" />Live</span><span><i className="legend-swatch swatch-dark" />Dark</span><span><i className="legend-swatch swatch-missing" />No device</span><span><i className="legend-swatch swatch-fault" />Incident</span></div>
-      <div className="map-compass"><span>N</span><Icon name="arrow" size={15} /></div>
+    <div className="network-map leaflet-network-map">
+      <MapContainer center={center} zoom={15} scrollWheelZoom className="leaflet-map-canvas">
+        <TileLayer attribution={mapAttribution} url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+        <MapViewport bounds={bounds} focusTicket={ticketInView} selectedPole={selectedPoleId ? poleById.get(selectedPoleId) : null} />
+
+        {links.map((link) => (
+          <Polyline
+            key={link.id}
+            pathOptions={{ color: link.dark ? "#ef806f" : "#4fa87f", opacity: link.dark ? 0.72 : 0.48, weight: link.dark ? 4 : 2 }}
+            positions={link.points}
+          />
+        ))}
+
+        {boundaryPairs.map((boundary) => (
+          <Polyline key={boundary.id} pathOptions={{ color: "#f5c26b", dashArray: "7 7", opacity: 0.95, weight: 6 }} positions={boundary.points} />
+        ))}
+
+        {validPoint(transformer) && (
+          <Marker eventHandlers={{ click: () => onSelectPole({ ...transformer, pole_id: transformer.dt_id, is_transformer: true }) }} icon={transformerIcon} position={point(transformer)}>
+            <Popup><PopupFacts pole={{ ...transformer, pole_id: transformer.dt_id, is_transformer: true }} transformer={transformer} /></Popup>
+            <Tooltip direction="top" offset={[0, -12]}>{transformer.dt_id}</Tooltip>
+          </Marker>
+        )}
+
+        {activeTickets.map((ticket) => (
+          <Marker eventHandlers={{ click: () => onSelectTicket(ticket) }} icon={faultIcon} key={ticket.ticket_id} position={point(ticket)}>
+            <Popup><IncidentPopup ticket={ticket} /></Popup>
+            <Tooltip direction="top" offset={[0, -15]}>{ticket.ticket_id}</Tooltip>
+          </Marker>
+        ))}
+
+        {activeTickets.map((ticket) => {
+          const boundaryPole = ticket.first_dark_pole_id ? poleById.get(ticket.first_dark_pole_id) : null;
+          return boundaryPole ? (
+            <Marker icon={boundaryIcon} key={`${ticket.ticket_id}-boundary`} position={point(boundaryPole)}>
+              <Tooltip direction="right" offset={[10, 0]}>Fault boundary</Tooltip>
+            </Marker>
+          ) : null;
+        })}
+
+        {mapPoles.map((pole) => (
+          <CircleMarker
+            center={point(pole)}
+            eventHandlers={{ click: () => onSelectPole(pole) }}
+            key={pole.pole_id}
+            pathOptions={{
+              color: selectedPoleId === pole.pole_id ? "#ffffff" : pole.device_id ? "#d8ffe9" : "#8b958f",
+              fillColor: pole.device_id ? (pole.is_energized ? "#7ce4bd" : "#ef806f") : "#59645e",
+              fillOpacity: pole.device_id ? 0.96 : 0.78,
+              opacity: selectedPoleId === pole.pole_id ? 1 : 0.85,
+              weight: selectedPoleId === pole.pole_id ? 3 : 1,
+            }}
+            radius={selectedPoleId === pole.pole_id ? 8 : 5}
+          >
+            <Popup><PopupFacts pole={pole} transformer={transformer} /></Popup>
+            <Tooltip direction="top">{pole.pole_id}</Tooltip>
+          </CircleMarker>
+        ))}
+      </MapContainer>
+      <div className="map-topbar">
+        <div><span className="eyebrow">OpenStreetMap live view</span><strong>{transformer?.dt_id || "Network"}</strong></div>
+        <span className="map-count"><span className="live-dot" />{mapPoles.length} poles - {activeTickets.length} incident{activeTickets.length === 1 ? "" : "s"}</span>
+      </div>
+      <div className="map-legend">
+        <span><i className="legend-swatch swatch-live" />Energized pole</span>
+        <span><i className="legend-swatch swatch-dark" />De-energized pole</span>
+        <span><i className="legend-swatch swatch-missing" />Dead/no device</span>
+        <span><i className="legend-swatch swatch-transformer" />Transformer</span>
+        <span><i className="legend-swatch swatch-fault" />Incident cluster</span>
+        <span><i className="legend-line swatch-boundary" />Fault span</span>
+      </div>
+      <div className={cx("map-focus-chip", ticketInView && "map-focus-active")}>
+        <Icon name="target" size={14} />
+        {ticketInView ? `Focused ${ticketInView.ticket_id}` : "Fit to network"}
+      </div>
     </div>
   );
 }
