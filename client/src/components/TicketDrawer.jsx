@@ -13,12 +13,14 @@ import {
   locationLabel,
   restorationCopy,
   statusLabel,
+  structuredIncidentSummary,
   suggestedOperatorAction,
 } from "../utils/format.js";
 
 export default function TicketDrawer({ ticket, onClose, onStatus }) {
   if (!ticket) return null;
   const restoration = restorationCopy(ticket);
+  const aiSummary = structuredIncidentSummary(ticket);
   const isFinal = ["verified", "closed"].includes(ticket.status);
   const canAcknowledge = ticket.status === "detected";
   const canAssignCrew = ["detected", "acknowledged"].includes(ticket.status);
@@ -33,7 +35,18 @@ export default function TicketDrawer({ ticket, onClose, onStatus }) {
         <div className={cx("restoration-banner", `restoration-${restoration.tone}`)}><Icon name={restoration.tone === "ready" ? "check" : "wrench"} size={18} /><div><strong>{restoration.title}</strong><span>{restoration.detail}</span></div></div>
         <div className="ai-summary-panel" data-tour="ai-summary">
           <div className="drawer-section-title"><span>AI incident summary <HelpTooltip label="AI summary">The AI explains the deterministic localizer result in plain English. It does not choose the fault location.</HelpTooltip></span></div>
-          <p>{ticket.ai_summary || ticket.confidence_reason || "The deterministic localization engine found a probable outage boundary from live pole state changes."}</p>
+          <div className="ai-summary-grid">
+            {aiSummary.map((item) => (
+              <div className={cx("ai-summary-block", `summary-${item.tone}`)} key={item.label}>
+                <span className="summary-icon"><Icon name={item.icon} size={16} /></span>
+                <div>
+                  <span>{item.label}</span>
+                  <strong>{item.value}</strong>
+                  <p>{item.detail}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="detail-grid">
           <div><span>Fault location</span><strong>{locationLabel(ticket.localization_level)}</strong></div>

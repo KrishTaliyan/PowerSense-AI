@@ -272,6 +272,7 @@ function App() {
             <div className="sync-status"><span className="live-dot" />Live <span className="sync-time">{lastSync ? formatTime(lastSync) : "-"}</span></div>
             <button className={cx("focus-button", focusMode && "focus-enabled")} data-tour="focus-mode" onClick={() => setFocusMode((mode) => !mode)} type="button"><Icon name="target" size={16} />{focusMode ? "Focus on" : "Focus mode"}</button>
             <button className="theme-toggle" aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} type="button"><Icon name={theme === "dark" ? "sun" : "moon"} size={16} /><span>{theme === "dark" ? "Light" : "Dark"}</span></button>
+            <button className="tour-launch-button" data-tour="tour-launch" onClick={restartTour} type="button"><Icon name="help" size={16} /><span>Tour</span></button>
             <button className="icon-button" aria-label="Open settings" onClick={() => setSettingsOpen(true)} type="button"><Icon name="settings" size={17} /></button>
             <button className="icon-button" aria-label="Refresh data" onClick={refresh} type="button"><Icon name="refresh" size={17} /></button>
           </div>

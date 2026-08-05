@@ -26,23 +26,32 @@ export default function SimulationPage({ busy, error, feederId, fromSeq, loading
     if (busy) {
       wasBusyRef.current = true;
       const start = Date.now();
-      setProgress(3);
+      const startTimeout = window.setTimeout(() => setProgress(3), 0);
       const interval = window.setInterval(() => {
         const elapsed = Date.now() - start;
         // Approaches 92% asymptotically — never claims done until the response actually lands.
         const pct = 92 * (1 - Math.exp(-elapsed / EXPECTED_DURATION_MS));
         setProgress(Math.min(92, Math.round(pct)));
       }, 150);
-      return () => window.clearInterval(interval);
+      return () => {
+        window.clearTimeout(startTimeout);
+        window.clearInterval(interval);
+      };
     }
 
     if (wasBusyRef.current) {
-      setProgress(100);
-      const timeout = window.setTimeout(() => {
-        setProgress(0);
-        wasBusyRef.current = false;
-      }, 600);
-      return () => window.clearTimeout(timeout);
+      let resetTimeout;
+      const doneTimeout = window.setTimeout(() => {
+        setProgress(100);
+        resetTimeout = window.setTimeout(() => {
+          setProgress(0);
+          wasBusyRef.current = false;
+        }, 600);
+      }, 0);
+      return () => {
+        window.clearTimeout(doneTimeout);
+        window.clearTimeout(resetTimeout);
+      };
     }
 
     return undefined;

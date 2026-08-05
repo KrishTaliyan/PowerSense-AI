@@ -4,25 +4,28 @@ import ConfidenceBreakdown from "./ConfidenceBreakdown.jsx";
 import HelpTooltip from "./HelpTooltip.jsx";
 import Icon from "./Icon.jsx";
 import StatusPill from "./StatusPill.jsx";
-import { cx, faultLabel, formatDate, locationLabel, restorationCopy } from "../utils/format.js";
+import { cx, estimatedFaultSpan, faultLabel, formatDate, incidentPriority, locationLabel, restorationCopy } from "../utils/format.js";
 
 function TicketTableRow({ ticket, onStatus, onSelect }) {
   const restoration = restorationCopy(ticket);
+  const priority = incidentPriority(ticket);
+  const affectedCount = Number(ticket.affected_pole_count) || 0;
+  const impactWidth = `${Math.min(100, Math.max(14, affectedCount * 8))}%`;
   const isFinal = ["verified", "closed"].includes(ticket.status);
   const canAcknowledge = ticket.status === "detected";
   const canAssignCrew = ["detected", "acknowledged"].includes(ticket.status);
   const canVerify = ticket.can_verify_repair && !isFinal;
 
   return (
-    <tr key={ticket.ticket_id} onClick={() => onSelect(ticket)}>
+    <tr className={cx("queue-row", `queue-row-${priority.tone}`)} key={ticket.ticket_id} onClick={() => onSelect(ticket)}>
       <td>
         <div className="table-incident">
           <span className={cx("table-icon", `glyph-${ticket.fault_type}`)}><Icon name="bolt" size={14} /></span>
-          <div><strong>{ticket.ticket_id}</strong><span>{faultLabel(ticket.fault_type)} - {formatDate(ticket.detected_at)}</span></div>
+          <div><span className={cx("priority-badge", `priority-${priority.tone}`)}>{priority.label}</span><strong>{ticket.ticket_id}</strong><span>{faultLabel(ticket.fault_type)} - {formatDate(ticket.detected_at)}</span></div>
         </div>
       </td>
-      <td><strong>{ticket.dt_id || ticket.feeder_id || "-"}</strong><span className="table-sub">{locationLabel(ticket.localization_level)} {ticket.pincode ? `- ${ticket.pincode}` : ""}</span></td>
-      <td><strong>{ticket.affected_pole_count || 0} poles</strong><span className={cx("table-sub", `restoration-text-${restoration.tone}`)}>{restoration.title}</span></td>
+      <td><strong>{estimatedFaultSpan(ticket)}</strong><span className="table-sub">{locationLabel(ticket.localization_level)} {ticket.pincode ? `- ${ticket.pincode}` : ""}</span></td>
+      <td><div className="table-impact"><strong>{affectedCount} poles</strong><span className={cx("table-sub", `restoration-text-${restoration.tone}`)}>{restoration.title}</span><span className="impact-meter"><i style={{ width: impactWidth }} /></span></div></td>
       <td><ConfidenceBreakdown compact ticket={ticket} /></td>
       <td><StatusPill status={ticket.status} /></td>
       <td onClick={(event) => event.stopPropagation()}>

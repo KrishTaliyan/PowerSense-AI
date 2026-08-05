@@ -69,6 +69,54 @@ export function confidenceTone(value) {
   return "Needs review";
 }
 
+export function incidentPriority(ticket) {
+  const affected = Number(ticket?.affected_pole_count) || 0;
+  if (ticket?.fault_type === "feeder" || affected >= 25) return { label: "Critical", tone: "critical" };
+  if (ticket?.fault_type === "transformer" || affected >= 8) return { label: "High impact", tone: "high" };
+  if (ticket?.can_verify_repair) return { label: "Ready to close", tone: "ready" };
+  return { label: "Localized", tone: "watch" };
+}
+
+export function structuredIncidentSummary(ticket) {
+  const affected = Number(ticket?.affected_pole_count) || 0;
+  const remaining = Number(ticket?.remaining_dark_poles ?? affected);
+  const span = estimatedFaultSpan(ticket);
+  const summary = ticket?.ai_summary || ticket?.confidence_reason || "Live pole state changes triggered the outage localizer.";
+
+  return [
+    {
+      icon: "alert",
+      label: "What happened",
+      value: `${faultLabel(ticket?.fault_type)} detected near ${span}.`,
+      detail: summary,
+      tone: "event",
+    },
+    {
+      icon: "target",
+      label: "Why",
+      value: ticket?.confidence_reason || "The engine compared the last live pole with the first dark pole.",
+      detail: `${confidenceLabel(ticket?.confidence)} confidence from ${locationLabel(ticket?.localization_level)} evidence.`,
+      tone: "reason",
+    },
+    {
+      icon: "users",
+      label: "Impact",
+      value: `${affected} affected pole${affected === 1 ? "" : "s"}`,
+      detail: remaining > 0
+        ? `${remaining} pole${remaining === 1 ? "" : "s"} still dark and waiting for restoration telemetry.`
+        : "All affected poles are reporting energized.",
+      tone: remaining > 0 ? "impact" : "resolved",
+    },
+    {
+      icon: ticket?.can_verify_repair ? "check" : "wrench",
+      label: "Next action",
+      value: suggestedOperatorAction(ticket),
+      detail: ticket?.can_verify_repair ? "Verification is available now." : "Keep the response moving through the incident workflow.",
+      tone: ticket?.can_verify_repair ? "resolved" : "action",
+    },
+  ];
+}
+
 export function confidenceBreakdown(ticket) {
   const score = Number(ticket?.confidence) || 0;
   const factors = [];

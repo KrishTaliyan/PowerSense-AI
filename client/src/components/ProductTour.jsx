@@ -4,6 +4,12 @@ import Icon from "./Icon.jsx";
 
 const steps = [
   {
+    target: "[data-tour='tour-launch']",
+    view: "Dashboard",
+    title: "Take the guided tour",
+    detail: "PowerSense is feature-rich, so this walkthrough highlights the views, controls, and evidence panels a first-time operator should understand.",
+  },
+  {
     target: "[data-tour='overview']",
     view: "Dashboard",
     title: "Start with the shift picture",
@@ -13,7 +19,7 @@ const steps = [
     target: "[data-tour='map']",
     view: "Map",
     title: "Inspect the network boundary",
-    detail: "The OpenStreetMap view shows energized poles, de-energized poles, missing devices, transformer anchors, and fault markers without a paid API key.",
+    detail: "The OpenStreetMap view highlights fault spans, affected poles, boundary endpoints, transformer anchors, and fault markers without a paid API key.",
   },
   {
     target: "[data-tour='incidents']",
@@ -61,7 +67,7 @@ const steps = [
     target: "[data-tour='ai-summary']",
     view: "Tickets",
     title: "Read the AI summary",
-    detail: "AI writes the plain-English incident explanation only. The deterministic localizer still decides the fault location and confidence.",
+    detail: "Incident details use What happened, Why, Impact, and Next action so operators can move from explanation to response quickly.",
   },
   {
     target: "[data-tour='shortcuts']",
@@ -130,6 +136,7 @@ export default function ProductTour({ active, onClose, onNavigate }) {
   });
 
   const progress = useMemo(() => `${index + 1} / ${steps.length}`, [index]);
+  const progressWidth = useMemo(() => `${Math.round(((index + 1) / steps.length) * 100)}%`, [index]);
   if (!active) return null;
 
   function finish() {
@@ -160,9 +167,11 @@ export default function ProductTour({ active, onClose, onNavigate }) {
       <div className="tour-card">
         <div className="tour-top">
           <span className="tour-step">{progress}</span>
-          <button className="tour-skip" onClick={finish} type="button">Skip Tour</button>
+          <button className="tour-skip" onClick={finish} type="button">Skip tour</button>
         </div>
+        <div className="tour-progress-track"><i style={{ width: progressWidth }} /></div>
         <span className="tour-icon"><Icon name="spark" size={18} /></span>
+        <span className="tour-view-chip">{step.view}</span>
         <h2>{step.title}</h2>
         <p>{step.detail}</p>
         <div className="tour-actions">
