@@ -89,7 +89,7 @@ export default function SimulationPage({ busy, error, feederId, fromSeq, loading
   if (error && !selectedDt) return <ErrorState detail={error} onRetry={refresh} title="Scenario lab could not load" />;
 
   return (
-    <div className="page-stack" data-tour="simulation">
+    <div className="page-stack" data-tour="practice-lab">
       <div className="page-heading">
         <div><span className="eyebrow">Operator training</span><h1>Scenario lab</h1><p>Practice the response loop without touching a real field device.</p></div>
         <div className="heading-stat"><strong>12</strong><span>safe scenario paths</span></div>
@@ -109,7 +109,7 @@ export default function SimulationPage({ busy, error, feederId, fromSeq, loading
               </div>
             </div>
           )}
-          <div className="scenario-section">
+          <div className="scenario-section" data-tour="simulator">
             <span className="section-kicker">Configured incident run</span>
             <fieldset className="sim-config" disabled={busy} style={{ border: 0, padding: 0, margin: 0 }}>
               <label>

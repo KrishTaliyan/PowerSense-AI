@@ -54,7 +54,7 @@ export default function OverviewPage({
         </div>
       </section>
 
-      <section className="metric-grid">
+      <section className="metric-grid" data-tour="metrics">
         <MetricCard accent="coral" detail={activeTickets.length ? `${activeTickets.filter((ticket) => ticket.fault_type !== "span").length} wide-area` : "No active response required"} help="Open tickets that have not yet been verified or closed." icon="alert" label="Active incidents" onClick={() => jumpTo("Tickets")} value={stats.active_faults ?? 0} />
         <MetricCard accent="amber" detail={stats.critical_faults ? "Crew attention required" : "No critical events"} help="Feeder or transformer events, plus span faults affecting many poles." icon="bolt" label="Critical exposure" value={stats.critical_faults ?? 0} />
         <MetricCard accent="blue" detail={selectedTransformer ? `${selectedTransformer.dt_id} in focus` : "Select a transformer"} help="Devices whose last signal is older than the offline threshold. This is sensor health, not proof of an outage." icon="satellite" label="Devices offline" value={stats.devices_offline ?? 0} />

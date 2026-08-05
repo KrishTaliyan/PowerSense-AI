@@ -33,7 +33,11 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(() => {
     if (typeof window === "undefined") return false;
-    return window.localStorage.getItem("powersense-tour-complete") !== "true";
+    try {
+      return window.localStorage.getItem("powersense-tour-complete") !== "true";
+    } catch {
+      return false;
+    }
   });
   const [theme, setTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
@@ -176,7 +180,11 @@ function App() {
   }, []);
 
   function restartTour() {
-    window.localStorage.removeItem("powersense-tour-complete");
+    try {
+      window.localStorage.removeItem("powersense-tour-complete");
+    } catch {
+      // The tour can still run for the current session when storage is unavailable.
+    }
     setSettingsOpen(false);
     setTourOpen(true);
   }
@@ -241,7 +249,7 @@ function App() {
       <aside className="sidebar">
         <div className="brand"><span className="brand-mark"><Icon name="bolt" size={18} /></span><div><strong>PowerSense</strong><span>OUTAGE INTELLIGENCE</span></div></div>
         <div className="sidebar-section-label">Main views</div>
-        <nav className="side-nav">
+        <nav className="side-nav" data-tour="shortcuts">
           {navigation.map((item, index) => (
             <button className={cx("nav-item", activeTab === item.id && "nav-active")} key={item.id} onClick={() => setActiveTab(item.id)} type="button">
               <span className="nav-icon"><Icon name={item.icon} size={17} /></span>
@@ -260,9 +268,9 @@ function App() {
         <header className="topbar">
           <div className="breadcrumbs"><span>PowerSense</span><Icon name="arrow" size={13} /><strong>{navigation.find((item) => item.id === activeTab)?.label}</strong></div>
           <div className="topbar-actions">
-            <button className="command-button" onClick={() => setCommandOpen(true)} type="button"><Icon name="command" size={16} /><span>Quick actions</span><kbd>Ctrl K</kbd></button>
+            <button className="command-button" data-tour="quick-actions" onClick={() => setCommandOpen(true)} type="button"><Icon name="command" size={16} /><span>Quick actions</span><kbd>Ctrl K</kbd></button>
             <div className="sync-status"><span className="live-dot" />Live <span className="sync-time">{lastSync ? formatTime(lastSync) : "-"}</span></div>
-            <button className={cx("focus-button", focusMode && "focus-enabled")} onClick={() => setFocusMode((mode) => !mode)} type="button"><Icon name="target" size={16} />{focusMode ? "Focus on" : "Focus mode"}</button>
+            <button className={cx("focus-button", focusMode && "focus-enabled")} data-tour="focus-mode" onClick={() => setFocusMode((mode) => !mode)} type="button"><Icon name="target" size={16} />{focusMode ? "Focus on" : "Focus mode"}</button>
             <button className="theme-toggle" aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`} onClick={() => setTheme((current) => current === "dark" ? "light" : "dark")} type="button"><Icon name={theme === "dark" ? "sun" : "moon"} size={16} /><span>{theme === "dark" ? "Light" : "Dark"}</span></button>
             <button className="icon-button" aria-label="Open settings" onClick={() => setSettingsOpen(true)} type="button"><Icon name="settings" size={17} /></button>
             <button className="icon-button" aria-label="Refresh data" onClick={refresh} type="button"><Icon name="refresh" size={17} /></button>

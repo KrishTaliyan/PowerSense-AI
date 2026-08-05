@@ -1147,7 +1147,7 @@ button:disabled { cursor: not-allowed; }
 
 .tour-highlight {
   position: relative;
-  z-index: 76;
+  z-index: 1201;
   outline: 2px solid #7ce4bd;
   outline-offset: 5px;
   box-shadow: 0 0 0 8px rgb(124 228 189 / 12%);
@@ -2101,5 +2101,19 @@ button:disabled { cursor: not-allowed; }
     bottom: 58px;
     left: 12px;
     justify-content: center;
+  }
+}
+
+@media (max-width: 860px) {
+  .focus-button[data-tour="focus-mode"] {
+    width: 35px;
+    display: flex;
+    justify-content: center;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .focus-button[data-tour="focus-mode"] svg {
+    flex: 0 0 auto;
   }
 }

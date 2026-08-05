@@ -30,7 +30,7 @@ export default function TicketDrawer({ ticket, onClose, onStatus }) {
         <div className="drawer-hero"><span className={cx("drawer-fault-icon", `glyph-${ticket.fault_type}`)}><Icon name={ticket.fault_type === "span" ? "bolt" : "alert"} size={21} /></span><div><strong>{faultLabel(ticket.fault_type)}</strong><span>Detected {formatDate(ticket.detected_at)}</span></div><StatusPill status={ticket.status} /></div>
         <IncidentTimeline ticket={ticket} />
         <div className={cx("restoration-banner", `restoration-${restoration.tone}`)}><Icon name={restoration.tone === "ready" ? "check" : "wrench"} size={18} /><div><strong>{restoration.title}</strong><span>{restoration.detail}</span></div></div>
-        <div className="ai-summary-panel">
+        <div className="ai-summary-panel" data-tour="ai-summary">
           <div className="drawer-section-title"><span>AI incident summary <HelpTooltip label="AI summary">The AI explains the deterministic localizer result in plain English. It does not choose the fault location.</HelpTooltip></span></div>
           <p>{ticket.ai_summary || ticket.confidence_reason || "The deterministic localization engine found a probable outage boundary from live pole state changes."}</p>
         </div>
