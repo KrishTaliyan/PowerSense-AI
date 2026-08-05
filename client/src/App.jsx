@@ -114,6 +114,17 @@ function App() {
     window.localStorage.setItem("powersense-theme", theme);
   }, [theme]);
 
+  // Auto-dismiss the toast so operators don't have to close it manually.
+  // Errors stay a little longer than success notices since they usually need reading.
+  useEffect(() => {
+    if (!notice && !error) return undefined;
+    const timeout = window.setTimeout(() => {
+      setNotice("");
+      setError("");
+    }, error ? 6000 : 4000);
+    return () => window.clearTimeout(timeout);
+  }, [notice, error]);
+
   async function post(path, body = {}, label = "Scenario") {
     setBusy(true);
     setNotice("");

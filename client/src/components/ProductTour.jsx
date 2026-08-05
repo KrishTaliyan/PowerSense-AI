@@ -163,24 +163,32 @@ export default function ProductTour({ active, onClose, onNavigate }) {
   }
 
   return (
-    <div className="tour-backdrop" role="dialog" aria-modal="true" aria-label="PowerSense product tour">
-      <div className="tour-card">
-        <div className="tour-top">
-          <span className="tour-step">{progress}</span>
-          <button className="tour-skip" onClick={finish} type="button">Skip tour</button>
-        </div>
-        <div className="tour-progress-track"><i style={{ width: progressWidth }} /></div>
-        <span className="tour-icon"><Icon name="spark" size={18} /></span>
-        <span className="tour-view-chip">{step.view}</span>
-        <h2>{step.title}</h2>
-        <p>{step.detail}</p>
-        <div className="tour-actions">
-          <ActionButton disabled={index === 0} onClick={goBack} variant="ghost">Previous</ActionButton>
-          <ActionButton icon={index === steps.length - 1 ? "check" : "arrow"} onClick={goNext} variant="primary">
-            {index === steps.length - 1 ? "Finish" : "Next"}
-          </ActionButton>
+    <>
+      {/* Dim scrim only - the highlighted target pokes above this via .tour-highlight's z-index. */}
+      <div className="tour-backdrop" aria-hidden="true" />
+      {/* The card lives on its own fixed, always-on-top layer so it can never be
+          covered by the highlighted section, no matter how large that section is
+          or what stacking context it creates. This fixes the "buttons go behind
+          the UI after step 1" bug. */}
+      <div className="tour-card-layer" role="dialog" aria-modal="true" aria-label="PowerSense product tour">
+        <div className="tour-card">
+          <div className="tour-top">
+            <span className="tour-step">{progress}</span>
+            <button className="tour-skip" onClick={finish} type="button">Skip tour</button>
+          </div>
+          <div className="tour-progress-track"><i style={{ width: progressWidth }} /></div>
+          <span className="tour-icon"><Icon name="spark" size={18} /></span>
+          <span className="tour-view-chip">{step.view}</span>
+          <h2>{step.title}</h2>
+          <p>{step.detail}</p>
+          <div className="tour-actions">
+            <ActionButton disabled={index === 0} onClick={goBack} variant="ghost">Previous</ActionButton>
+            <ActionButton icon={index === steps.length - 1 ? "check" : "arrow"} onClick={goNext} variant="primary">
+              {index === steps.length - 1 ? "Finish" : "Next"}
+            </ActionButton>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
