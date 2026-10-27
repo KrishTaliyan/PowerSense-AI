@@ -1,16 +1,32 @@
-# React + Vite
+# PowerSense AI · Client
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 + Vite operator console for PowerSense AI.
 
-Currently, two official plugins are available:
+## Scripts
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+npm install
+npm run dev       # http://localhost:5173
+npm run build     # production bundle in dist/
+npm run preview   # serve the production bundle
+npm run lint
+```
 
-## React Compiler
+Copy `.env.example` to `.env.local` to point the console at another API (`VITE_API_BASE_URL`).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Structure
 
-## Expanding the ESLint configuration
+| Path | Purpose |
+| --- | --- |
+| `src/App.jsx` | Shell, polling, keyboard shortcuts, toasts, routing between views |
+| `src/App.css` | Design system: tokens for light/dark themes, layout and components |
+| `src/pages/` | Overview, Network map, Incidents, Live signals, Practice lab (lazy-loaded) |
+| `src/components/` | Shared UI: incident drawer, command palette, map, tour, tables |
+| `src/utils/api.js` | `fetch` wrapper with timeouts and readable errors |
+| `src/utils/format.js` | Labels, incident summaries, confidence breakdowns |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Performance notes
+
+- An inline boot screen and theme script in `index.html` paint before any JavaScript loads.
+- Each page and Leaflet are separate chunks; the remaining chunks are prefetched once the first view is ready.
+- Polling pauses while the tab is hidden and resumes immediately when it is shown again.

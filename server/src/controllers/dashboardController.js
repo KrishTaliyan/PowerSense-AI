@@ -41,8 +41,8 @@ export async function getDashboard(req, res) {
       Pole.countDocuments({ is_energized: false }),
       Transformer.countDocuments(),
       Ticket.find().sort({ detected_at: -1 }).limit(20).select("-__v").lean(),
-      Telemetry.find().sort({ received_at: -1 }).limit(25).select("-__v"),
-      Ticket.find({ verified_at: { $ne: null } }).select("detected_at verified_at"),
+      Telemetry.find().sort({ received_at: -1 }).limit(25).select("-__v").lean(),
+      Ticket.find({ verified_at: { $ne: null } }).select("detected_at verified_at").lean(),
     ]);
 
     const avgResolutionMinutes = average(

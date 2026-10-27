@@ -1,9 +1,14 @@
 import Pole from "../models/Pole.js";
 import Transformer from "../models/Transformer.js";
 
+function parseLimit(value, fallback, max) {
+  const limit = Number.parseInt(value, 10);
+  return Number.isFinite(limit) && limit > 0 ? Math.min(limit, max) : fallback;
+}
+
 export async function listTransformers(req, res) {
   try {
-    const limit = Math.min(Number(req.query.limit || 80), 200);
+    const limit = parseLimit(req.query.limit, 80, 200);
     const transformers = await Transformer.find().sort({ feeder_id: 1, dt_id: 1 }).limit(limit).lean();
 
     const poleCounts = await Pole.aggregate([
@@ -30,11 +35,12 @@ export async function listPoles(req, res) {
     if (req.query.dt_id) query.dt_id = req.query.dt_id;
     if (req.query.feeder_id) query.feeder_id = req.query.feeder_id;
 
-    const limit = Math.min(Number(req.query.limit || 500), 2000);
+    const limit = parseLimit(req.query.limit, 500, 2000);
     const poles = await Pole.find(query)
       .sort({ feeder_id: 1, dt_id: 1, seq_on_line: 1, pole_id: 1 })
       .limit(limit)
-      .select("-__v");
+      .select("-__v -createdAt -updatedAt")
+      .lean();
 
     return res.json(poles);
   } catch (err) {

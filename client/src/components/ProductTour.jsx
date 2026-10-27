@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { navigation } from "../constants.js";
 import ActionButton from "./ActionButton.jsx";
 import Icon from "./Icon.jsx";
 
@@ -178,7 +179,7 @@ export default function ProductTour({ active, onClose, onNavigate }) {
           </div>
           <div className="tour-progress-track"><i style={{ width: progressWidth }} /></div>
           <span className="tour-icon"><Icon name="spark" size={18} /></span>
-          <span className="tour-view-chip">{step.view}</span>
+          <span className="tour-view-chip">{navigation.find((item) => item.id === step.view)?.label || step.view}</span>
           <h2>{step.title}</h2>
           <p>{step.detail}</p>
           <div className="tour-actions">

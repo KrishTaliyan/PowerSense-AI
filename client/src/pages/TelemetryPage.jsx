@@ -9,8 +9,10 @@ export default function TelemetryPage({ error, loading, recentTelemetry, refresh
   return (
     <div className="page-stack" data-tour="telemetry">
       <div className="page-heading">
-        <div><span className="eyebrow">Device observability</span><h1>Signal stream</h1><p>Every packet is auditable, deduplicated, and classified before it changes state.</p></div>
-        <div className="heading-stat"><strong>{signalContinuity}%</strong><span>clean signal rate <HelpTooltip label="Clean signal rate">Recent packets accepted after duplicate and stale checks. Lower values mean telemetry needs review before field action.</HelpTooltip></span></div>
+        <div><span className="eyebrow">Device observability</span><h1>Live signals</h1><p>Every packet is auditable, deduplicated, and classified before it changes state.</p></div>
+        <div className="heading-stats">
+          <div className="heading-stat"><strong>{signalContinuity}%</strong><span>Clean signal rate <HelpTooltip label="Clean signal rate">Recent packets accepted after duplicate and stale checks. Lower values mean telemetry needs review before field action.</HelpTooltip></span></div>
+        </div>
       </div>
       <TelemetryTable telemetry={recentTelemetry} />
     </div>

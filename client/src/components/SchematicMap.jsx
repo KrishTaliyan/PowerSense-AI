@@ -1,11 +1,22 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
+import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap, ZoomControl } from "react-leaflet";
 import Icon from "./Icon.jsx";
 import { cx, estimatedFaultSpan } from "../utils/format.js";
 
-const mapAttribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+const mapAttribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+// Standard OSM tiles need no API key; the stylesheet tones them per theme so grid overlays stay readable.
+const tileUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+const colors = {
+  live: "#22c55e",
+  dark: "#ef4444",
+  affected: "#f59e0b",
+  boundary: "#facc15",
+  missing: "#64748b",
+  selected: "#3b82f6",
+};
 
 function isOpen(ticket) {
   return ticket && !["verified", "closed"].includes(ticket.status);
@@ -39,24 +50,28 @@ const boundaryIcon = markerIcon("leaflet-boundary", "", 18);
 const lastLiveIcon = markerIcon("leaflet-boundary-live", "LIVE", 34);
 const firstDarkIcon = markerIcon("leaflet-boundary-dark", "DARK", 34);
 
-function MapViewport({ bounds, focusTicket, selectedPole }) {
+function MapViewport({ bounds, boundsKey, focusTicket, selectedPole }) {
   const map = useMap();
+  const latest = useRef({ bounds, focusTicket, selectedPole });
+  const focusKey = focusTicket && validPoint(focusTicket) ? focusTicket.ticket_id : "";
+  const poleKey = selectedPole && validPoint(selectedPole) ? selectedPole.pole_id : "";
 
   useEffect(() => {
-    if (focusTicket && validPoint(focusTicket)) {
-      map.flyTo(point(focusTicket), Math.max(map.getZoom(), 17), { duration: 0.85 });
-      return;
-    }
+    latest.current = { bounds, focusTicket, selectedPole };
+  });
 
-    if (selectedPole && validPoint(selectedPole)) {
-      map.flyTo(point(selectedPole), Math.max(map.getZoom(), 17), { duration: 0.75 });
-      return;
+  // Polling hands the map fresh arrays every few seconds. Keying on IDs means the camera
+  // only moves when the operator's focus changes, so manual pan/zoom is never reset.
+  useEffect(() => {
+    const { bounds: currentBounds, focusTicket: ticket, selectedPole: pole } = latest.current;
+    if (focusKey) {
+      map.flyTo(point(ticket), Math.max(map.getZoom(), 17), { duration: 0.85 });
+    } else if (poleKey) {
+      map.flyTo(point(pole), Math.max(map.getZoom(), 17), { duration: 0.75 });
+    } else if (currentBounds?.length) {
+      map.fitBounds(currentBounds, { padding: [40, 40], maxZoom: 16, animate: true, duration: 0.65 });
     }
-
-    if (bounds?.length) {
-      map.fitBounds(bounds, { padding: [34, 34], maxZoom: 16, animate: true, duration: 0.65 });
-    }
-  }, [bounds, focusTicket, map, selectedPole]);
+  }, [boundsKey, focusKey, map, poleKey]);
 
   return null;
 }
@@ -98,11 +113,13 @@ function IncidentPopup({ ticket }) {
 }
 
 export default function SchematicMap({
+  compact = false,
   focusTicket,
   onSelectPole,
   onSelectTicket,
   poles,
   selectedPoleId,
+  theme = "dark",
   tickets,
   transformer,
 }) {
@@ -126,6 +143,7 @@ export default function SchematicMap({
     const entities = [...mapPoles, ...(validPoint(transformer) ? [transformer] : []), ...activeTickets].filter(validPoint);
     return entities.map(point);
   }, [activeTickets, mapPoles, transformer]);
+  const boundsKey = `${transformer?.dt_id || ""}:${mapPoles.length}:${activeTickets.map((ticket) => ticket.ticket_id).join(",")}`;
   const center = useMemo(() => {
     if (ticketInView && validPoint(ticketInView)) return point(ticketInView);
     if (validPoint(transformer)) return point(transformer);
@@ -167,15 +185,16 @@ export default function SchematicMap({
   }
 
   return (
-    <div className="network-map leaflet-network-map">
-      <MapContainer center={center} zoom={15} scrollWheelZoom className="leaflet-map-canvas">
-        <TileLayer attribution={mapAttribution} url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        <MapViewport bounds={bounds} focusTicket={ticketInView} selectedPole={selectedPoleId ? poleById.get(selectedPoleId) : null} />
+    <div className={cx("network-map leaflet-network-map", `map-theme-${theme}`)}>
+      <MapContainer center={center} zoom={15} scrollWheelZoom={!compact} zoomControl={false} className="leaflet-map-canvas">
+        <TileLayer attribution={mapAttribution} maxZoom={19} url={tileUrl} />
+        <ZoomControl position="bottomright" />
+        <MapViewport bounds={bounds} boundsKey={boundsKey} focusTicket={ticketInView} selectedPole={selectedPoleId ? poleById.get(selectedPoleId) : null} />
 
         {links.map((link) => (
           <Polyline
             key={link.id}
-            pathOptions={{ color: link.dark ? "#ef806f" : "#4fa87f", opacity: link.dark ? 0.72 : 0.48, weight: link.dark ? 4 : 2 }}
+            pathOptions={{ color: link.dark ? colors.dark : colors.live, opacity: link.dark ? 0.75 : 0.45, weight: link.dark ? 3.5 : 2 }}
             positions={link.points}
           />
         ))}
@@ -185,17 +204,17 @@ export default function SchematicMap({
             center={point(pole)}
             interactive={false}
             key={`${pole.pole_id}-affected-halo`}
-            pathOptions={{ color: "#f09a78", dashArray: "3 6", fillColor: "#f09a78", fillOpacity: 0.12, opacity: 0.85, weight: 2 }}
+            pathOptions={{ color: colors.affected, dashArray: "3 6", fillColor: colors.affected, fillOpacity: 0.12, opacity: 0.85, weight: 2 }}
             radius={14}
           />
         ))}
 
         {boundaryPairs.map((boundary) => (
-          <Polyline key={`${boundary.id}-span-glow`} pathOptions={{ color: "#f09a78", lineCap: "round", opacity: 0.32, weight: 14 }} positions={boundary.points} />
+          <Polyline key={`${boundary.id}-span-glow`} pathOptions={{ color: colors.dark, lineCap: "round", opacity: 0.25, weight: 14 }} positions={boundary.points} />
         ))}
 
         {boundaryPairs.map((boundary) => (
-          <Polyline key={`${boundary.id}-span`} pathOptions={{ color: "#ffe08a", dashArray: "5 8", lineCap: "round", opacity: 1, weight: 6 }} positions={boundary.points}>
+          <Polyline key={`${boundary.id}-span`} pathOptions={{ color: colors.boundary, dashArray: "5 8", lineCap: "round", opacity: 1, weight: 5 }} positions={boundary.points}>
             <Tooltip direction="top" sticky>Fault span: {boundary.live.pole_id} to {boundary.dark.pole_id}</Tooltip>
           </Polyline>
         ))}
@@ -244,11 +263,11 @@ export default function SchematicMap({
               eventHandlers={{ click: () => onSelectPole(pole) }}
               key={pole.pole_id}
               pathOptions={{
-                color: selectedPoleId === pole.pole_id ? "#ffffff" : isBoundary ? "#ffe08a" : isAffected ? "#ffd0b3" : pole.device_id ? "#d8ffe9" : "#8b958f",
-                fillColor: isAffected ? (pole.is_energized ? "#f5c26b" : "#ef806f") : pole.device_id ? (pole.is_energized ? "#7ce4bd" : "#ef806f") : "#59645e",
-                fillOpacity: pole.device_id || isAffected ? 0.96 : 0.78,
-                opacity: selectedPoleId === pole.pole_id || isAffected ? 1 : 0.85,
-                weight: selectedPoleId === pole.pole_id ? 3 : isBoundary ? 4 : isAffected ? 3 : 1,
+                color: selectedPoleId === pole.pole_id ? colors.selected : isBoundary ? colors.boundary : theme === "light" ? "#ffffff" : "#0b0e14",
+                fillColor: isAffected ? (pole.is_energized ? colors.affected : colors.dark) : pole.device_id ? (pole.is_energized ? colors.live : colors.dark) : colors.missing,
+                fillOpacity: pole.device_id || isAffected ? 0.95 : 0.8,
+                opacity: 1,
+                weight: selectedPoleId === pole.pole_id ? 3 : isBoundary ? 3 : 1.5,
               }}
               radius={selectedPoleId === pole.pole_id ? 8 : isBoundary ? 9 : isAffected ? 7 : 5}
             >
@@ -259,31 +278,30 @@ export default function SchematicMap({
         })}
       </MapContainer>
       <div className="map-topbar">
-        <div><span className="eyebrow">OpenStreetMap live view</span><strong>{transformer?.dt_id || "Network"}</strong></div>
-        <span className="map-count"><span className="live-dot" />{mapPoles.length} poles - {openTickets.length} incident{openTickets.length === 1 ? "" : "s"}</span>
-      </div>
-      <div className="map-legend">
-        <span><i className="legend-swatch swatch-live" />Energized pole</span>
-        <span><i className="legend-swatch swatch-dark" />De-energized pole</span>
-        <span><i className="legend-swatch swatch-affected" />Affected pole</span>
-        <span><i className="legend-swatch swatch-missing" />Dead/no device</span>
-        <span><i className="legend-swatch swatch-transformer" />Transformer</span>
-        <span><i className="legend-swatch swatch-fault" />Incident cluster</span>
-        <span><i className="legend-line swatch-boundary" />Fault span</span>
+        <span className="map-count"><span className="status-indicator" />{mapPoles.length} poles · {openTickets.length} incident{openTickets.length === 1 ? "" : "s"}</span>
+        <span className={cx("map-focus-chip", ticketInView && "map-focus-active")}>
+          <Icon name="target" size={13} />
+          {ticketInView ? `Focused ${ticketInView.ticket_id}` : "Fit to network"}
+        </span>
       </div>
       {highlightedTicket && (
         <div className="map-incident-strip">
-          <span className="map-incident-icon"><Icon name="alert" size={16} /></span>
+          <span className="map-incident-icon"><Icon name="alert" size={15} /></span>
           <div>
             <span className="eyebrow">Fault span in focus</span>
             <strong>{estimatedFaultSpan(highlightedTicket)}</strong>
-            <small>{highlightedTicket.affected_pole_count || affectedPoleIds.size} affected pole{(highlightedTicket.affected_pole_count || affectedPoleIds.size) === 1 ? "" : "s"} highlighted</small>
+            <small>{highlightedTicket.affected_pole_count || affectedPoleIds.size} affected pole{(highlightedTicket.affected_pole_count || affectedPoleIds.size) === 1 ? "" : "s"}</small>
           </div>
         </div>
       )}
-      <div className={cx("map-focus-chip", ticketInView && "map-focus-active")}>
-        <Icon name="target" size={14} />
-        {ticketInView ? `Focused ${ticketInView.ticket_id}` : "Fit to network"}
+      <div className={cx("map-legend", compact && "map-legend-compact")}>
+        <span><i className="legend-swatch swatch-live" />Energized</span>
+        <span><i className="legend-swatch swatch-dark" />De-energized</span>
+        <span><i className="legend-swatch swatch-affected" />Affected</span>
+        <span><i className="legend-swatch swatch-missing" />No device</span>
+        {!compact && <span><i className="legend-swatch swatch-transformer" />Transformer</span>}
+        {!compact && <span><i className="legend-swatch swatch-fault" />Incident</span>}
+        {!compact && <span><i className="legend-line swatch-boundary" />Fault span</span>}
       </div>
     </div>
   );

@@ -99,13 +99,13 @@ export async function ingestTelemetry(payload, options = {}) {
         rssi,
         fw,
       },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
+      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
     );
 
     pole = await Pole.findOneAndUpdate(
       { pole_id },
       { is_energized: energized, last_telemetry_at: new Date() },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (pole && !options.skipDetection) {

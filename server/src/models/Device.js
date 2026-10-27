@@ -17,4 +17,7 @@ const deviceSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Offline-device count on the dashboard filters by last signal time.
+deviceSchema.index({ last_seen_at: 1 });
+
 export default mongoose.model("Device", deviceSchema);

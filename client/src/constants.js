@@ -7,5 +7,3 @@ export const navigation = [
   { id: "Telemetry", label: "Live signals", icon: "pulse" },
   { id: "Simulation", label: "Practice lab", icon: "flask" },
 ];
-
-export const stageOrder = ["detected", "acknowledged", "crew_assigned", "resolved", "verified"];

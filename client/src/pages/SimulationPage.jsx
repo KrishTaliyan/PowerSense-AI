@@ -5,9 +5,9 @@ import Icon from "../components/Icon.jsx";
 import { ErrorState, PageSkeleton } from "../components/PageState.jsx";
 import { cx } from "../utils/format.js";
 
-const EXPECTED_DURATION_MS = 12000; // tune this to your typical real response time
+const EXPECTED_DURATION_MS = 12000; // typical round trip for a configured scenario against a hosted API
 
-export default function SimulationPage({ busy, error, feederId, fromSeq, loading, post, refresh, selectedDt }) {
+export default function SimulationPage({ busy, error, feederId, fromSeq, loading, post, refresh, selectedDt, selectedTransformer }) {
   const [faultType, setFaultType] = useState("span");
   const [severity, setSeverity] = useState(55);
   const [noise, setNoise] = useState({
@@ -84,11 +84,25 @@ export default function SimulationPage({ busy, error, feederId, fromSeq, loading
     { title: "Maintenance Window", description: "Scheduled outage path that suppresses false alarms.", icon: "clock", path: "/simulate/scheduled-outage", body: { dt_id: selectedDt } },
   ];
 
+  const noiseOptions = [
+    { key: "duplicate_packet", label: "Duplicate telemetry" },
+    { key: "out_of_order_telemetry", label: "Out-of-order telemetry" },
+    { key: "missing_telemetry", label: "Missing telemetry" },
+    { key: "kill_device", label: "Dead device" },
+    { key: "firmware_12_device", label: "Firmware 1.2 device" },
+    { key: "multiple_faults", label: "Multiple simultaneous faults" },
+  ];
+  const faultTypes = [
+    { id: "span", label: "Span" },
+    { id: "transformer", label: "Transformer" },
+    { id: "feeder", label: "Feeder" },
+  ];
+
   const renderScenarioCard = (action, variant = "quiet", disabled = false) => (
-    <button className={cx("scenario-card", variant === "quiet" && "scenario-muted")} disabled={busy || disabled} key={action.title} onClick={() => post(action.path || "/simulate/repair", action.body, action.title)} type="button">
-      <span className={cx("scenario-icon", `scenario-${variant}`)}><Icon name={action.icon} size={19} /></span>
-      <span><strong>{action.title}</strong><small>{action.description}</small></span>
-      <Icon name="arrow" size={16} />
+    <button className={cx("scenario-card", `scenario-card-${variant}`)} disabled={busy || disabled} key={action.title} onClick={() => post(action.path || "/simulate/repair", action.body, action.title)} type="button">
+      <span className={cx("scenario-icon", `scenario-${variant}`)}><Icon name={action.icon} size={17} /></span>
+      <span className="scenario-copy"><strong>{action.title}</strong><small>{action.description}</small></span>
+      <Icon name="chevronRight" size={15} />
     </button>
   );
 
@@ -114,71 +128,88 @@ export default function SimulationPage({ busy, error, feederId, fromSeq, loading
   if (loading) return <PageSkeleton rows={3} />;
   if (error && !selectedDt) return <ErrorState detail={error} onRetry={refresh} title="Scenario lab could not load" />;
 
+  const scenarioCount = presetActions.length + faultActions.length + repairActions.length + noiseActions.length;
+
   return (
     <div className="page-stack" data-tour="practice-lab">
       <div className="page-heading">
-        <div><span className="eyebrow">Operator training</span><h1>Scenario lab</h1><p>Practice the response loop without touching a real field device.</p></div>
-        <div className="heading-stat"><strong>18</strong><span>safe scenario paths</span></div>
+        <div><span className="eyebrow">Operator training</span><h1>Practice lab</h1><p>Practice the response loop with simulated device messages. No real field equipment is touched.</p></div>
+        <div className="heading-actions">
+          <span className="target-chip"><Icon name="layers" size={14} />Target <strong>{selectedTransformer?.dt_id || selectedDt || "—"}</strong> · <strong>{feederId || "—"}</strong></span>
+        </div>
       </div>
-      <div className="simulation-layout">
-        <section className="panel scenario-panel">
-          <div className="panel-header"><div><span className="eyebrow">Practice safely</span><h2>Try a scenario and watch the grid respond.</h2></div><span className="lab-badge"><Icon name="spark" size={14} /> Ready to try</span></div>
-          <p className="panel-intro">These actions create realistic device messages. Use them to learn the full response: find the problem, send a crew, repair the line, and confirm power is back.</p>
-          {(busy || progress > 0) && (
-            <div className="sim-progress" role="status" aria-live="polite">
-              <div className="sim-progress-head">
-                <span>{busy ? "Running scenario — updating telemetry and tickets…" : "Done"}</span>
-                <span className="sim-progress-percent">{progress}%</span>
-              </div>
-              <div className="sim-progress-track">
-                <div className="sim-progress-fill" style={{ width: `${progress}%` }} />
-              </div>
-            </div>
-          )}
-          <div className="scenario-section" data-tour="simulator">
-            <span className="section-kicker">Configured incident run</span>
-            <fieldset className="sim-config" disabled={busy} style={{ border: 0, padding: 0, margin: 0 }}>
-              <label>
-                <span>Fault type <HelpTooltip label="Fault type">Choose the outage pattern the deterministic localizer must distinguish.</HelpTooltip></span>
-                <select onChange={(event) => setFaultType(event.target.value)} value={faultType}>
-                  <option value="span">Span fault</option>
-                  <option value="transformer">Transformer outage</option>
-                  <option value="feeder">Feeder outage</option>
-                </select>
-              </label>
-              <label>
-                <span>Severity <HelpTooltip label="Severity">For span faults, higher severity starts closer to the transformer and affects more downstream poles.</HelpTooltip></span>
-                <input max="100" min="10" onChange={(event) => setSeverity(Number(event.target.value))} type="range" value={severity} />
-                <strong>{severity}%</strong>
-              </label>
-              <div className="noise-options">
-                <span>Noise injection <HelpTooltip label="Noise injection">Adds messy telemetry after the fault so operators can see duplicate, stale, or offline-device handling.</HelpTooltip></span>
-                <label><input checked={noise.duplicate_packet} onChange={() => toggleNoise("duplicate_packet")} type="checkbox" /> Duplicate telemetry</label>
-                <label><input checked={noise.out_of_order_telemetry} onChange={() => toggleNoise("out_of_order_telemetry")} type="checkbox" /> Out-of-order telemetry</label>
-                <label><input checked={noise.missing_telemetry} onChange={() => toggleNoise("missing_telemetry")} type="checkbox" /> Missing telemetry</label>
-                <label><input checked={noise.kill_device} onChange={() => toggleNoise("kill_device")} type="checkbox" /> Dead device</label>
-                <label><input checked={noise.firmware_12_device} onChange={() => toggleNoise("firmware_12_device")} type="checkbox" /> Firmware 1.2 device</label>
-                <label><input checked={noise.multiple_faults} onChange={() => toggleNoise("multiple_faults")} type="checkbox" /> Multiple simultaneous faults</label>
-              </div>
-              <label className="repair-toggle">
-                <input checked={repairAfterFault} onChange={() => setRepairAfterFault((value) => !value)} type="checkbox" />
-                <span>Run repair simulation after fault</span>
-              </label>
-              <ActionButton disabled={busy || !selectedDt || (faultType === "feeder" && !feederId)} icon={busy ? undefined : "play"} onClick={runConfiguredScenario} variant="primary">
-                {busy ? `Running… ${progress}%` : "Run configured scenario"}
-              </ActionButton>
-            </fieldset>
+
+      {(busy || progress > 0) && (
+        <div className="sim-progress" role="status" aria-live="polite">
+          <div className="sim-progress-head">
+            <span>{busy ? "Running scenario: sending telemetry and updating incidents…" : "Scenario complete"}</span>
+            <span className="sim-progress-percent">{progress}%</span>
           </div>
-          <div className="scenario-section"><span className="section-kicker">Simulation presets</span><div className="scenario-grid">{presetActions.map((action) => renderScenarioCard({ ...action, path: action.path || "/simulate/configured" }, "quiet", !selectedDt || (action.body.fault_type === "feeder" && !feederId)))}</div></div>
-          <div className="scenario-section"><span className="section-kicker">Create a power problem</span><div className="scenario-grid">{faultActions.map((action) => renderScenarioCard(action, action.variant, !selectedDt || (action.path.includes("feeder") && !feederId)))}</div></div>
-          <div className="scenario-section"><span className="section-kicker">Bring power back</span><div className="scenario-grid">{repairActions.map((action) => renderScenarioCard(action, "mint", !selectedDt || (action.body.scope === "feeder" && !feederId)))}</div></div>
-          <div className="scenario-section"><span className="section-kicker">Test messy device messages</span><div className="scenario-grid">{noiseActions.map((action) => renderScenarioCard(action))}</div></div>
-        </section>
-        <section className="panel playbook-panel">
-          <div className="panel-header"><div><span className="eyebrow">Response guide</span><h2>Three steps to close an incident</h2></div><span className="playbook-number">03</span></div>
-          <div className="playbook-steps"><div><span>01</span><strong>Find it</strong><p>A power change becomes one grouped incident.</p></div><div><span>02</span><strong>Send help</strong><p>Acknowledge the issue and assign a crew.</p></div><div><span>03</span><strong>Confirm it</strong><p>Close only after live messages show power is back.</p></div></div>
-          <div className="lab-callout"><Icon name="shield" size={18} /><div><strong>Clear and explainable</strong><span>The system calculates the fault location; AI only writes the summary.</span></div></div>
-        </section>
+          <div className="sim-progress-track"><div className="sim-progress-fill" style={{ width: `${progress}%` }} /></div>
+        </div>
+      )}
+
+      <div className="simulation-layout">
+        <div className="simulation-main">
+          <section className="panel" data-tour="simulator">
+            <div className="panel-header"><div><span className="eyebrow">Configured run</span><h2>Build a scenario</h2></div><span className="count-badge">{scenarioCount} scenario paths</span></div>
+            <fieldset className="sim-config" disabled={busy}>
+              <div className="field">
+                <span className="field-label">Fault type <HelpTooltip label="Fault type">Choose the outage pattern the deterministic localizer must distinguish.</HelpTooltip></span>
+                <div className="segmented segmented-full" role="radiogroup" aria-label="Fault type">
+                  {faultTypes.map((type) => (
+                    <button aria-checked={faultType === type.id} className={cx("segment", faultType === type.id && "segment-active")} key={type.id} onClick={() => setFaultType(type.id)} role="radio" type="button">{type.label}</button>
+                  ))}
+                </div>
+              </div>
+              <label className="field">
+                <span className="field-label">Severity <HelpTooltip label="Severity">For span faults, higher severity starts closer to the transformer and affects more downstream poles.</HelpTooltip><b>{severity}%</b></span>
+                <input className="range" max="100" min="10" onChange={(event) => setSeverity(Number(event.target.value))} style={{ "--range-fill": `${((severity - 10) / 90) * 100}%` }} type="range" value={severity} />
+              </label>
+              <div className="field field-wide">
+                <span className="field-label">Noise injection <HelpTooltip label="Noise injection">Adds messy telemetry after the fault so operators can see duplicate, stale, or offline-device handling.</HelpTooltip></span>
+                <div className="chip-group">
+                  {noiseOptions.map((option) => (
+                    <button aria-pressed={noise[option.key]} className={cx("toggle-chip", noise[option.key] && "toggle-chip-on")} key={option.key} onClick={() => toggleNoise(option.key)} type="button">
+                      <Icon name={noise[option.key] ? "check" : "plus"} size={13} />{option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="sim-config-footer field-wide">
+                <label className="checkbox-row">
+                  <input checked={repairAfterFault} onChange={() => setRepairAfterFault((value) => !value)} type="checkbox" />
+                  <span>Run repair and verification after the fault</span>
+                </label>
+                <ActionButton disabled={busy || !selectedDt || (faultType === "feeder" && !feederId)} icon={busy ? undefined : "play"} onClick={runConfiguredScenario} variant="primary">
+                  {busy ? `Running… ${progress}%` : "Run scenario"}
+                </ActionButton>
+              </div>
+            </fieldset>
+          </section>
+
+          <section className="panel">
+            <div className="panel-header"><div><span className="eyebrow">One click</span><h2>Presets</h2></div></div>
+            <div className="scenario-grid">{presetActions.map((action) => renderScenarioCard({ ...action, path: action.path || "/simulate/configured" }, "info", !selectedDt || (action.body.fault_type === "feeder" && !feederId)))}</div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-header"><div><span className="eyebrow">Individual actions</span><h2>Faults, repairs and telemetry noise</h2></div></div>
+            <div className="scenario-section"><span className="section-kicker">Create a power problem</span><div className="scenario-grid">{faultActions.map((action) => renderScenarioCard(action, action.variant, !selectedDt || (action.path.includes("feeder") && !feederId)))}</div></div>
+            <div className="scenario-section"><span className="section-kicker">Bring power back</span><div className="scenario-grid">{repairActions.map((action) => renderScenarioCard(action, "success", !selectedDt || (action.body.scope === "feeder" && !feederId)))}</div></div>
+            <div className="scenario-section"><span className="section-kicker">Test messy device messages</span><div className="scenario-grid">{noiseActions.map((action) => renderScenarioCard(action))}</div></div>
+          </section>
+        </div>
+
+        <aside className="panel playbook-panel">
+          <div className="panel-header"><div><span className="eyebrow">Response guide</span><h2>Closing an incident</h2></div></div>
+          <ol className="playbook-steps">
+            <li><span>1</span><div><strong>Find it</strong><p>A power change becomes one grouped incident with a localized boundary.</p></div></li>
+            <li><span>2</span><div><strong>Send help</strong><p>Acknowledge the incident and assign a field crew.</p></div></li>
+            <li><span>3</span><div><strong>Confirm it</strong><p>Verify only after live messages show every affected pole has power.</p></div></li>
+          </ol>
+          <div className="lab-callout"><Icon name="shield" size={16} /><div><strong>Deterministic first</strong><span>The engine calculates the fault location; AI only writes the plain-English summary.</span></div></div>
+        </aside>
       </div>
     </div>
   );

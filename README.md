@@ -12,7 +12,8 @@ PowerSense AI is a control-room outage intelligence demo for the Propel take-hom
 - OpenStreetMap network map with pole, transformer, fault boundary, and incident overlays.
 - Simulator presets and repair verification.
 - AI incident summaries that explain deterministic results without deciding fault location.
-- Operator affordances: onboarding tour, command palette, keyboard shortcuts, empty states, skeleton loading, tooltips, color legend, dark/light mode.
+- Operator affordances: onboarding tour, command palette with keyboard navigation, number-key view shortcuts, empty states, skeleton loading, tooltips, color legend, light/dark themes, and a responsive layout down to phone width.
+- Fast first paint: inline boot screen, lazy-loaded views and map, gzip-compressed API responses, and indexed dashboard queries.
 
 ## Run Locally
 
@@ -29,7 +30,11 @@ npm install
 npm run dev
 ```
 
-The client defaults to `http://localhost:5000/api`. Set `VITE_API_BASE_URL` for another backend.
+The client defaults to `http://localhost:5000/api`. Set `VITE_API_BASE_URL` for another backend. Both packages ship an `.env.example`.
+
+> `npm run seed` deletes all existing poles, devices, telemetry and tickets before generating the demo network.
+
+On free hosting tiers the API may sleep when idle; the console shows a "waking up the API server" notice while the first request is slow.
 
 ## Verification
 

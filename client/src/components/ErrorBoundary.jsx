@@ -23,17 +23,14 @@ export default class ErrorBoundary extends Component {
 
   render() {
     if (!this.state.hasError) return this.props.children;
-    return (
-      <div className="app-shell" style={{ display: "grid", placeItems: "center", minHeight: "100vh" }}>
-        <div className="state-card panel">
-          <span className="state-icon"><Icon name="alert" size={22} /></span>
-          <strong>The app hit an unexpected error</strong>
-          <span>{this.state.message}</span>
-          <button className="action-button button-primary" onClick={this.handleReload} type="button" style={{ marginTop: 8 }}>
-            Reload PowerSense
-          </button>
-        </div>
+    const card = (
+      <div className="state-card">
+        <span className="state-icon"><Icon name="alert" size={22} /></span>
+        <strong>{this.props.page ? "This view hit an unexpected error" : "PowerSense hit an unexpected error"}</strong>
+        <span>{this.state.message}</span>
+        <button className="action-button button-primary" onClick={this.handleReload} type="button">Reload PowerSense</button>
       </div>
     );
+    return this.props.page ? <div className="panel page-state-panel">{card}</div> : <div className="fatal-error">{card}</div>;
   }
 }

@@ -37,6 +37,10 @@ const poleSchema = new mongoose.Schema(
   }
 );
 
+// Dashboard counts dark poles on every poll.
+poleSchema.index({ is_energized: 1 });
+poleSchema.index({ feeder_id: 1, dt_id: 1, seq_on_line: 1, pole_id: 1 });
+
 const Pole = mongoose.model("Pole", poleSchema);
 
 export default Pole;

@@ -30,5 +30,8 @@ const telemetrySchema = new mongoose.Schema(
 
 // Duplicate detection ke liye: same device + same seq = same message
 telemetrySchema.index({ device_id: 1, seq: 1 });
+// Dashboard and replay read the newest packets first on every poll.
+telemetrySchema.index({ received_at: -1 });
+telemetrySchema.index({ pole_id: 1, received_at: 1 });
 
 export default mongoose.model("Telemetry", telemetrySchema);

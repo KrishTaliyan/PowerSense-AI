@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { API_BASE } from "../constants.js";
+import { apiRequest } from "../utils/api.js";
 import { cx, formatTime, titleCase } from "../utils/format.js";
 import ActionButton from "./ActionButton.jsx";
 import Icon from "./Icon.jsx";
@@ -39,9 +39,7 @@ export default function ReplayPanel({ ticket }) {
     setError("");
     setIsPlaying(false);
     try {
-      const response = await fetch(`${API_BASE}/tickets/${ticket.ticket_id}/replay`);
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "Replay unavailable");
+      const data = await apiRequest(`/tickets/${ticket.ticket_id}/replay`);
       setEvents(data.events || []);
       setPlayIndex(-1);
     } catch (err) {

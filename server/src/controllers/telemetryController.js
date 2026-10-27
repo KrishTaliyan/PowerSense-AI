@@ -1,6 +1,11 @@
 import { ingestTelemetry } from "../services/telemetryService.js";
 import Telemetry from "../models/Telemetry.js";
 
+function parseLimit(value, fallback, max) {
+  const limit = Number.parseInt(value, 10);
+  return Number.isFinite(limit) && limit > 0 ? Math.min(limit, max) : fallback;
+}
+
 export async function postTelemetry(req, res) {
   const { device_id, pole_id, event, energized, ts, seq } = req.body;
 
@@ -19,11 +24,12 @@ export async function postTelemetry(req, res) {
 
 export async function listRecentTelemetry(req, res) {
   try {
-    const limit = Math.min(Number(req.query.limit || 50), 200);
+    const limit = parseLimit(req.query.limit, 50, 200);
     const records = await Telemetry.find()
       .sort({ received_at: -1 })
       .limit(limit)
-      .select("-__v");
+      .select("-__v")
+      .lean();
 
     return res.json(records);
   } catch (err) {

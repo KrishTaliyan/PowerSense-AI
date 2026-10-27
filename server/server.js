@@ -10,7 +10,7 @@ async function startServer() {
   await connectDB();
 
   app.listen(PORT, () => {
-    console.log(`PowerFault AI server running on port ${PORT}`);
+    console.log(`PowerSense AI server running on port ${PORT}`);
   });
 }
 

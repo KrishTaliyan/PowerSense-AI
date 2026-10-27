@@ -58,4 +58,8 @@ const ticketSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Dashboard sorts by detection time; grouping and verification look tickets up by pole.
+ticketSchema.index({ detected_at: -1 });
+ticketSchema.index({ affected_pole_ids: 1, status: 1 });
+
 export default mongoose.model("Ticket", ticketSchema);
